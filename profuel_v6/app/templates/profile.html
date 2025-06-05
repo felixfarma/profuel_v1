@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Perfil de usuario</h2>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <p>{{ form.sexo.label }}<br>{{ form.sexo() }}</p>
+    <p>{{ form.altura.label }}<br>{{ form.altura() }}</p>
+    <p>{{ form.peso.label }}<br>{{ form.peso() }}</p>
+    <p>{{ form.fecha_nacimiento.label }}<br>{{ form.fecha_nacimiento() }}</p>
+    <p>{{ form.actividad.label }}<br>{{ form.actividad() }}</p>
+    <p>{{ form.submit() }}</p>
+</form>
+{% endblock %}

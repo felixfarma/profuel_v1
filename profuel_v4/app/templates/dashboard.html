@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Bienvenido al panel de control</h2>
+<p>Edad: {{ edad }} años</p>
+<p>BMR (TMB): {{ bmr }} kcal</p>
+<p>TDEE estimado: {{ tdee }} kcal</p>
+
+<p><a href="{{ url_for('auth.profile') }}">Editar perfil</a></p>
+<p><a href="{{ url_for('auth.logout') }}">Cerrar sesión</a></p>
+{% endblock %}

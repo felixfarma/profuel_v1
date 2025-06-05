@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Dashboard</h2>
+<p>Edad: {{ edad }} años</p>
+<p>BMR (TMB): {{ bmr }} kcal</p>
+<p>TDEE estimado: {{ tdee }} kcal</p>
+<p>Total kcal consumidas hoy: {{ total_kcal }} kcal</p>
+<p>Proteínas: {{ total_proteinas }} g</p>
+<p>Carbohidratos: {{ total_carbs }} g</p>
+<p>Grasas: {{ total_grasas }} g</p>
+<p><a href="{{ url_for('auth.add_meal') }}">Añadir comida</a></p>
+<p><a href="{{ url_for('auth.profile') }}">Editar perfil</a></p>
+<p><a href="{{ url_for('auth.logout') }}">Cerrar sesión</a></p>
+{% endblock %}
