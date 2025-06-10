@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Añadir comida</h2>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <p>{{ form.name.label }}<br>{{ form.name() }}</p>
+    <p>{{ form.date.label }}<br>{{ form.date() }}</p>
+    <p>{{ form.protein.label }}<br>{{ form.protein() }}</p>
+    <p>{{ form.carbs.label }}<br>{{ form.carbs() }}</p>
+    <p>{{ form.fat.label }}<br>{{ form.fat() }}</p>
+    <p>{{ form.submit() }}</p>
+</form>
+{% endblock %}
