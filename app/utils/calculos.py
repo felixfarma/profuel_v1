@@ -51,3 +51,14 @@ def calcular_kcal(proteinas, carbohidratos, grasas):
       9 kcal/g de grasas
     """
     return (proteinas * 4) + (carbohidratos * 4) + (grasas * 9)
+
+
+def bmr_mifflin_st_jeor(sexo, peso, altura, edad):
+    """
+    Alias de calcular_bmr para la API pública de tests:
+    Calcula la Tasa Metabólica Basal (BMR) usando la fórmula de
+    Mifflin–St Jeor. 
+    Paréntesis idénticos a calcular_bmr, para que los tests 
+    que llamen a calc.bmr_mifflin_st_jeor(...) pasen correctamente.
+    """
+    return calcular_bmr(sexo, peso, altura, edad)
