@@ -2,6 +2,7 @@
 
 from datetime import date
 
+
 def calcular_edad(fecha_nacimiento):
     """
     Devuelve la edad actual en años dados fecha_nacimiento (datetime.date).
@@ -9,15 +10,16 @@ def calcular_edad(fecha_nacimiento):
     hoy = date.today()
     # Si aún no ha cumplido este año, resta 1
     return (
-        hoy.year 
-        - fecha_nacimiento.year 
+        hoy.year
+        - fecha_nacimiento.year
         - ((hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
     )
+
 
 def calcular_bmr(sexo, peso, altura, edad):
     """
     Calcula la Tasa Metabólica Basal (BMR) usando la fórmula de
-    Mifflin–St Jeor: 
+    Mifflin–St Jeor:
       Hombres: 10*peso + 6.25*altura − 5*edad + 5
       Mujeres: 10*peso + 6.25*altura − 5*edad − 161
 
@@ -27,10 +29,11 @@ def calcular_bmr(sexo, peso, altura, edad):
       - altura: en cm (float)
       - edad: en años (int)
     """
-    if sexo.upper() == 'M':
+    if sexo.upper() == "M":
         return 10 * peso + 6.25 * altura - 5 * edad + 5
     else:
         return 10 * peso + 6.25 * altura - 5 * edad - 161
+
 
 def calcular_tdee(bmr, factor_actividad):
     """
@@ -38,6 +41,7 @@ def calcular_tdee(bmr, factor_actividad):
     la BMR por el factor de actividad (float).
     """
     return bmr * factor_actividad
+
 
 def calcular_kcal(proteinas, carbohidratos, grasas):
     """
