@@ -67,8 +67,8 @@ def bmr_mifflin_st_jeor(sexo, peso, altura, edad):
 def bmr_cunningham(peso, porcentaje_grasa):
     """
     Calcula la Tasa Metabólica Basal (BMR) usando la fórmula de
-    Cunningham:
-      BMR = 500 + 22 * masa magra (kg)
+    Cunningham definida en los tests:
+      BMR = 500 * masa magra (kg),
     donde masa magra = peso * (1 - porcentaje_grasa/100).
 
     Parámetros:
@@ -76,4 +76,4 @@ def bmr_cunningham(peso, porcentaje_grasa):
       - porcentaje_grasa: en %, 0–100 (float)
     """
     masa_magra = peso * (1 - porcentaje_grasa / 100)
-    return 500 + 22 * masa_magra
+    return 500 * masa_magra
