@@ -16,23 +16,37 @@ def calcular_edad(fecha_nacimiento):
     )
 
 
-def calcular_bmr(sexo, peso, altura, edad):
+def calcular_bmr(
+    formula,
+    sexo=None,
+    peso=None,
+    altura=None,
+    edad=None,
+    porcentaje_grasa=None
+):
     """
-    Calcula la Tasa Metabólica Basal (BMR) usando la fórmula de
-    Mifflin–St Jeor:
-      Hombres: 10*peso + 6.25*altura − 5*edad + 5
-      Mujeres: 10*peso + 6.25*altura − 5*edad − 161
+    Dispatcher de BMR que elige la fórmula:
+      - "mifflin": Mifflin–St Jeor → requiere sexo ('M'/'F'), peso (kg), altura (cm), edad (años)
+      - "cunningham": Cunningham → requiere peso (kg) y porcentaje_grasa (%)
+    Usa los mismos tests que llaman a calcular_bmr("mifflin", sexo=..., peso=..., altura=..., edad=...)
+    o a calcular_bmr("cunningham", peso=..., porcentaje_grasa=...).
+    """
+    key = formula.strip().lower()
+    if key == "mifflin":
+        if sexo is None or peso is None or altura is None or edad is None:
+            raise ValueError("Faltan parámetros para la fórmula Mifflin–St Jeor")
+        # Hombres: +5, Mujeres: −161
+        ajuste = 5 if sexo.strip().upper() == "M" else -161
+        return 10 * peso + 6.25 * altura - 5 * edad + ajuste
 
-    Parámetros:
-      - sexo: 'M' o 'F'
-      - peso: en kg (float)
-      - altura: en cm (float)
-      - edad: en años (int)
-    """
-    if sexo.upper() == "M":
-        return 10 * peso + 6.25 * altura - 5 * edad + 5
+    elif key == "cunningham":
+        if peso is None or porcentaje_grasa is None:
+            raise ValueError("Faltan parámetros para la fórmula Cunningham")
+        masa_magra = peso * (1 - porcentaje_grasa / 100)
+        return 500 * masa_magra
+
     else:
-        return 10 * peso + 6.25 * altura - 5 * edad - 161
+        raise ValueError(f"Fórmula BMR desconocida: {formula!r}")
 
 
 def calcular_tdee(bmr, factor_actividad):
@@ -55,25 +69,15 @@ def calcular_kcal(proteinas, carbohidratos, grasas):
 
 def bmr_mifflin_st_jeor(sexo, peso, altura, edad):
     """
-    Alias de calcular_bmr para la API pública de tests:
-    Calcula la Tasa Metabólica Basal (BMR) usando la fórmula de
-    Mifflin–St Jeor. 
-    Paréntesis idénticos a calcular_bmr, para que los tests 
-    que llamen a calc.bmr_mifflin_st_jeor(...) pasen correctamente.
+    Alias de Mifflin–St Jeor para tests directos:
+    Calcula la BMR con la misma fórmula de calcular_bmr("mifflin", ...).
     """
-    return calcular_bmr(sexo, peso, altura, edad)
+    return calcular_bmr("mifflin", sexo=sexo, peso=peso, altura=altura, edad=edad)
 
 
 def bmr_cunningham(peso, porcentaje_grasa):
     """
-    Calcula la Tasa Metabólica Basal (BMR) usando la fórmula de
-    Cunningham definida en los tests:
-      BMR = 500 * masa magra (kg),
-    donde masa magra = peso * (1 - porcentaje_grasa/100).
-
-    Parámetros:
-      - peso: en kg (float)
-      - porcentaje_grasa: en %, 0–100 (float)
+    Alias de Cunningham para tests directos:
+    Calcula la BMR con la misma fórmula de calcular_bmr("cunningham", ...).
     """
-    masa_magra = peso * (1 - porcentaje_grasa / 100)
-    return 500 * masa_magra
+    return calcular_bmr("cunningham", peso=peso, porcentaje_grasa=porcentaje_grasa)
