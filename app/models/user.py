@@ -24,6 +24,7 @@ class Meal(db.Model):
     carbs = db.Column(db.Float, nullable=False)
     fat = db.Column(db.Float, nullable=False)
     kcal = db.Column(db.Float, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):

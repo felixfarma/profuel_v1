@@ -1,19 +1,24 @@
+# app/routes/auth.py
+
+import os
+from datetime import date
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import login_user, logout_user, login_required, current_user
-from datetime import date
 
 from app import db
 from app.models.user import User, Profile, Meal
+from app.models.food import Food
 from app.forms.profile_form import ProfileForm
-from app.forms.meal_form import MealForm
-from app.utils.calculos import calcular_edad, calcular_bmr, calcular_tdee, calcular_kcal
+from app.utils.calculos import calcular_edad, calcular_bmr, calcular_tdee
 
 auth_routes = Blueprint('auth', __name__)
+
 
 @auth_routes.route('/')
 def home():
     return redirect(url_for('auth.login'))
+
 
 @auth_routes.route('/register', methods=['GET', 'POST'])
 def register():
@@ -21,8 +26,7 @@ def register():
         email = request.form['email']
         password = request.form['password']
 
-        user = User.query.filter_by(email=email).first()
-        if user:
+        if User.query.filter_by(email=email).first():
             flash('El usuario ya existe.')
             return redirect(url_for('auth.register'))
 
@@ -31,51 +35,67 @@ def register():
         db.session.commit()
         flash('Registro exitoso. Ahora puedes iniciar sesión.')
         return redirect(url_for('auth.login'))
+
     return render_template('register.html')
+
 
 @auth_routes.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-
         user = User.query.filter_by(email=email).first()
+
         if not user or not check_password_hash(user.password, password):
             flash('Credenciales inválidas.')
             return redirect(url_for('auth.login'))
 
         login_user(user)
         return redirect(url_for('auth.dashboard'))
+
     return render_template('login.html')
 
-@auth_routes.route('/dashboard')
-@login_required
-def dashboard():
-    profile = Profile.query.filter_by(user_id=current_user.id).first()
-    if profile:
-        edad = calcular_edad(profile.fecha_nacimiento)
-        bmr = calcular_bmr(profile.sexo, profile.peso, profile.altura, edad)
-        tdee = calcular_tdee(bmr, float(profile.actividad))
-
-        hoy = date.today()
-        meals = Meal.query.filter_by(user_id=current_user.id, date=hoy).all()
-        total_proteinas = sum(m.protein for m in meals)
-        total_carbs = sum(m.carbs for m in meals)
-        total_grasas = sum(m.fat for m in meals)
-        total_kcal = sum(m.kcal for m in meals)
-
-        return render_template('dashboard.html', profile=profile, edad=edad, bmr=bmr, tdee=tdee,
-                                total_kcal=total_kcal, total_proteinas=total_proteinas,
-                                total_carbs=total_carbs, total_grasas=total_grasas)
-    else:
-        flash("Por favor, completa tu perfil primero.")
-        return redirect(url_for('auth.profile'))
 
 @auth_routes.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('auth.login'))
+
+
+@auth_routes.route('/dashboard')
+@login_required
+def dashboard():
+    profile = Profile.query.filter_by(user_id=current_user.id).first()
+    if not profile:
+        flash("Por favor, completa tu perfil primero.")
+        return redirect(url_for('auth.profile'))
+
+    edad = calcular_edad(profile.fecha_nacimiento)
+    bmr = calcular_bmr(profile.sexo, profile.peso, profile.altura, edad)
+    tdee = calcular_tdee(bmr, float(profile.actividad))
+
+    hoy = date.today()
+    meals = Meal.query.filter_by(user_id=current_user.id, date=hoy).all()
+
+    total_proteinas = sum(m.protein for m in meals)
+    total_carbs     = sum(m.carbs   for m in meals)
+    total_grasas    = sum(m.fat     for m in meals)
+    total_kcal      = sum(m.kcal    for m in meals)
+
+    return render_template(
+        'dashboard.html',
+        profile=profile,
+        edad=edad,
+        bmr=bmr,
+        tdee=tdee,
+        meals=meals,
+        total_kcal=total_kcal,
+        total_proteinas=total_proteinas,
+        total_carbs=total_carbs,
+        total_grasas=total_grasas
+    )
+
 
 @auth_routes.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -84,11 +104,11 @@ def profile():
     profile = Profile.query.filter_by(user_id=current_user.id).first()
 
     if request.method == 'GET' and profile:
-        form.sexo.data = profile.sexo
-        form.altura.data = profile.altura
-        form.peso.data = profile.peso
+        form.sexo.data             = profile.sexo
+        form.altura.data           = profile.altura
+        form.peso.data             = profile.peso
         form.fecha_nacimiento.data = profile.fecha_nacimiento
-        form.actividad.data = str(profile.actividad)
+        form.actividad.data        = str(profile.actividad)
 
     if form.validate_on_submit():
         if not profile:
@@ -102,16 +122,97 @@ def profile():
 
     return render_template('profile.html', form=form)
 
+
+def _compute_macros(food, qty, unit):
+    """
+    Calcula kcal, proteína, carbohidratos y grasa en función
+    de un alimento, cantidad y unidad (g, ml o unidad).
+    """
+    # Determina factor
+    if unit == food.default_unit and food.kcal_per_unit is not None:
+        factor = qty
+        base = 'unit'
+    else:
+        factor = qty / 100.0
+        base = '100g'
+
+    # Obtiene valores base, usando 0 si None
+    if base == 'unit':
+        kcal_base    = food.kcal_per_unit    or 0
+        protein_base = food.protein_per_unit or 0
+        carbs_base   = food.carbs_per_unit   or 0
+        fat_base     = food.fat_per_unit     or 0
+    else:
+        kcal_base    = food.kcal_per_100g    or 0
+        protein_base = food.protein_per_100g or 0
+        carbs_base   = food.carbs_per_100g   or 0
+        fat_base     = food.fat_per_100g     or 0
+
+    return (
+        kcal_base    * factor,
+        protein_base * factor,
+        carbs_base   * factor,
+        fat_base     * factor,
+    )
+
+
 @auth_routes.route('/add_meal', methods=['GET', 'POST'])
 @login_required
 def add_meal():
-    form = MealForm()
-    if form.validate_on_submit():
-        kcal = calcular_kcal(form.protein.data, form.carbs.data, form.fat.data)
-        meal = Meal(user_id=current_user.id, name=form.name.data, date=form.date.data,
-                    protein=form.protein.data, carbs=form.carbs.data, fat=form.fat.data, kcal=kcal)
+    if request.method == 'POST':
+        # Recoge valores del formulario manual
+        name  = request.form.get('name', '').strip()
+        try:
+            qty = float(request.form.get('quantity', 0))
+        except ValueError:
+            flash('Cantidad inválida.')
+            return redirect(url_for('auth.add_meal'))
+        unit  = request.form.get('unit', '')
+        mtype = request.form.get('type', '')
+
+        # Validaciones básicas
+        if not name:
+            flash('Nombre del alimento obligatorio.')
+            return redirect(url_for('auth.add_meal'))
+        if qty <= 0:
+            flash('La cantidad debe ser positiva.')
+            return redirect(url_for('auth.add_meal'))
+        if unit not in ('g', 'ml', 'unidad'):
+            flash('Unidad inválida.')
+            return redirect(url_for('auth.add_meal'))
+        if mtype not in ('desayuno', 'comida', 'merienda', 'cena'):
+            flash('Tipo de comida inválido.')
+            return redirect(url_for('auth.add_meal'))
+
+        # Busca o crea el alimento en la tabla Foods
+        food = Food.query.filter_by(name=name).first()
+        if not food:
+            food = Food(
+                name=name,
+                default_unit=unit,
+                default_quantity=qty
+            )
+            db.session.add(food)
+            db.session.commit()
+
+        # Calcula macros y kcal
+        kcal, protein, carbs, fat = _compute_macros(food, qty, unit)
+
+        # Crea la comida
+        meal = Meal(
+            user_id=current_user.id,
+            name=name,
+            date=date.today(),
+            protein=protein,
+            carbs=carbs,
+            fat=fat,
+            kcal=kcal,
+            meal_type=mtype
+        )
         db.session.add(meal)
         db.session.commit()
+
         flash('Comida añadida correctamente.')
         return redirect(url_for('auth.dashboard'))
-    return render_template('add_meal.html', form=form)
+
+    return render_template('add_meal.html')

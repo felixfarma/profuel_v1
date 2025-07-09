@@ -1,0 +1,6 @@
+name,kcal_per_100g,protein_per_100g,carbs_per_100g,fat_per_100g,kcal_per_unit,protein_per_unit,carbs_per_unit,fat_per_unit,default_unit,default_quantity
+Manzana,52.0,0.3,14.0,0.2,95.0,0.5,25.0,0.3,pieza,1
+Pan integral,250.0,9.0,49.0,3.4,80.0,2.9,15.7,1.1,rebanada,1
+Pechuga de pollo,165.0,31.0,0.0,3.6,,,,,g,100
+Leche entera,61.0,3.2,4.8,3.3,150.0,8.0,12.0,8.3,vaso,1
+Aceite de oliva virgen extra,884.0,0.0,0.0,100.0,119.0,0.0,0.0,13.5,cucharada,1

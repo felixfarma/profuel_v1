@@ -1,13 +1,129 @@
+<!-- templates/add_meal.html -->
+
 {% extends 'base.html' %}
+
+{% block title %}Añadir comida{% endblock %}
+
 {% block content %}
-<h2>Añadir comida</h2>
-<form method="POST">
-    {{ form.hidden_tag() }}
-    <p>{{ form.name.label }}<br>{{ form.name() }}</p>
-    <p>{{ form.date.label }}<br>{{ form.date() }}</p>
-    <p>{{ form.protein.label }}<br>{{ form.protein() }}</p>
-    <p>{{ form.carbs.label }}<br>{{ form.carbs() }}</p>
-    <p>{{ form.fat.label }}<br>{{ form.fat() }}</p>
-    <p>{{ form.submit() }}</p>
-</form>
+<div class="container mt-4">
+
+  {# Flash messages #}
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="alert alert-success">
+        {% for msg in messages %}
+          {{ msg }}
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <h2>Añadir comida</h2>
+  <form id="add-meal-form" method="post" action="{{ url_for('auth.add_meal') }}">
+
+    <!-- 1) Buscador de alimentos -->
+    <div class="mb-3 position-relative">
+      <label for="food-search" class="form-label">Buscar alimento</label>
+      <input type="text"
+             id="food-search"
+             name="name"
+             class="form-control"
+             placeholder="Escribe 2 o más letras para buscar..."
+             autocomplete="off"
+             required>
+      <ul id="suggestions"
+          class="list-group position-absolute w-100"
+          style="z-index:1000; max-height:200px; overflow-y:auto;"></ul>
+    </div>
+
+    <!-- 2) Cantidad -->
+    <div class="mb-3">
+      <label for="quantity" class="form-label">Cantidad</label>
+      <input type="number"
+             id="quantity"
+             name="quantity"
+             class="form-control"
+             step="any"
+             required>
+    </div>
+
+    <!-- 3) Unidad -->
+    <div class="mb-3">
+      <label for="unit" class="form-label">Unidad</label>
+      <select id="unit" name="unit" class="form-select" required>
+        <option value="g">g</option>
+        <option value="ml">ml</option>
+        <option value="unidad">unidad</option>
+      </select>
+    </div>
+
+    <!-- 4) Tipo de comida -->
+    <div class="mb-3">
+      <label for="type" class="form-label">Tipo de comida</label>
+      <select id="type" name="type" class="form-select" required>
+        <option value="desayuno">Desayuno</option>
+        <option value="comida">Comida</option>
+        <option value="merienda">Merienda</option>
+        <option value="cena">Cena</option>
+      </select>
+    </div>
+
+    <!-- 5) Crear alimento si falta -->
+    <input type="hidden" name="create_food_if_missing" value="true">
+
+    <!-- Botones: guardar y volver al dashboard -->
+    <button type="submit" class="btn btn-primary">Guardar comida</button>
+    <a href="{{ url_for('auth.dashboard') }}" class="btn btn-secondary ms-2">
+      Volver al Dashboard
+    </a>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput    = document.getElementById('food-search');
+  const suggestionsBox = document.getElementById('suggestions');
+  let debounceTimer;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) {
+      suggestionsBox.innerHTML = '';
+      return;
+    }
+
+    debounceTimer = setTimeout(() => {
+      fetch(`/api/foods?search=${encodeURIComponent(q)}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        const list = data.foods.concat(data.suggestions);
+        suggestionsBox.innerHTML = '';
+        list.forEach(item => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item list-group-item-action';
+          li.textContent = `${item.name} — ${item.macros_per_100g.kcal} kcal/100g`;
+          li.style.cursor = 'pointer';
+          li.addEventListener('click', () => {
+            searchInput.value = item.name;
+            document.getElementById('quantity').value = item.default_quantity;
+            document.getElementById('unit').value     = item.default_unit;
+            suggestionsBox.innerHTML = '';
+          });
+          suggestionsBox.appendChild(li);
+        });
+      });
+    }, 300);
+  });
+
+  // Cierra el listado al clicar fuera
+  document.addEventListener('click', e => {
+    if (!searchInput.contains(e.target)) {
+      suggestionsBox.innerHTML = '';
+    }
+  });
+});
+</script>
 {% endblock %}

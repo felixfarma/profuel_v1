@@ -1,35 +1,52 @@
+import os
+from dotenv import load_dotenv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_migrate import Migrate
 
+# Carga las variables definidas en .env
+load_dotenv()
+
+# Inicialización de extensiones
 db = SQLAlchemy()
+migrate = Migrate()
 login_manager = LoginManager()
 
 def create_app():
     app = Flask(__name__)
 
-    app.config['SECRET_KEY'] = 'tu_clave_secreta_aqui'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///profuel.db'
+    # Configuración desde variables de entorno
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    # Inicializa las extensiones con la app
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
 
-    from app.models.user import User, Profile, Meal
-    with app.app_context():
-        db.create_all()
-
-    # Rutas principales
+    # Registro de blueprints existentes
     from app.routes.auth import auth_routes
     app.register_blueprint(auth_routes)
 
-    # Ruta del buscador predictivo (v7)
-    from app.routes.search import search_routes
-    app.register_blueprint(search_routes)
+    from app.routes.api import api
+    app.register_blueprint(api)
 
-    # Ruta para mostrar la plantilla del buscador
-    from app.routes.main import main_routes
-    app.register_blueprint(main_routes)
+    # --- Integración Strava OAuth -----------------------
+    from app.routes.strava_routes import strava_bp
+    app.register_blueprint(strava_bp)
+    # ----------------------------------------------------
+
+    # Registro del comando CLI 'seed-foods'
+    from app.commands import seed_foods
+    app.cli.add_command(seed_foods)
+
+    # En desarrollo: crea todas las tablas si no existen
+    with app.app_context():
+        from app.models.user import User, Profile, Meal
+        from app.models.food import Food
+        db.create_all()
 
     return app
