@@ -13,6 +13,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      SQLALCHEMY_DATABASE_URI: sqlite:///:memory:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
