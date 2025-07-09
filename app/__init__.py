@@ -1,3 +1,5 @@
+# app/__init__.py
+
 import os
 from dotenv import load_dotenv
 from flask import Flask
@@ -5,19 +7,23 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
 
-# Carga las variables definidas en .env
+# 1. Carga variables de .env
 load_dotenv()
 
-# Inicialización de extensiones
+# 2. Inicializa extensiones
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
 
 
 def create_app():
-    app = Flask(__name__)
+    # 3. Crea la aplicación con carpeta instance activada
+    app = Flask(__name__, instance_relative_config=True)
 
-    # Configuración desde variables de entorno, con fallback a SQLite en memoria
+    # 4. Asegura que la carpeta instance exista
+    os.makedirs(app.instance_path, exist_ok=True)
+
+    # 5. Configuración
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev")
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
         "DATABASE_URL",
@@ -25,28 +31,27 @@ def create_app():
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # Inicializa las extensiones con la app
+    # 6. Inicializa las extensiones
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
 
-    # Registro de blueprints existentes
+    # 7. Registra blueprints
     from app.routes.auth import auth_routes
     app.register_blueprint(auth_routes)
 
     from app.routes.api import api
     app.register_blueprint(api)
 
-    # Integración Strava OAuth
     from app.routes.strava_routes import strava_bp
     app.register_blueprint(strava_bp)
 
-    # Registro del comando CLI 'seed-foods'
+    # 8. Comando CLI personalizado
     from app.commands import seed_foods
     app.cli.add_command(seed_foods)
 
-    # En desarrollo y en tests: crea todas las tablas si no existen
+    # 9. Crea las tablas si no existen (incluye generar el archivo .db)
     with app.app_context():
         db.create_all()
 
