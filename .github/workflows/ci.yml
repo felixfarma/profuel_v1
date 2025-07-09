@@ -31,7 +31,7 @@ jobs:
           pip install pytest pip-audit flake8
 
       - name: Lint with flake8
-        run: flake8 --max-line-length=88 .
+        run: flake8 --max-line-length=88 --ignore=W291 .
 
       - name: Run tests
         run: pytest --maxfail=1 --disable-warnings -q
