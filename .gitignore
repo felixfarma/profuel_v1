@@ -1,0 +1,4 @@
+# Entorno y archivos generados
+.env
+*.pyc
+__pycache__/
