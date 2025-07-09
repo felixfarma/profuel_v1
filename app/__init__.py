@@ -45,8 +45,8 @@ def create_app():
 
     # En desarrollo: crea todas las tablas si no existen
     with app.app_context():
-        from app.models.user import User, Profile, Meal
-        from app.models.food import Food
+        #from app.models.user import User, Profile, Meal
+        #from app.models.food import Food
         db.create_all()
 
     return app

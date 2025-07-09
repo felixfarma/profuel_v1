@@ -1,6 +1,6 @@
 # app/routes/auth.py
 
-import os
+#import os
 from datetime import date
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from werkzeug.security import generate_password_hash, check_password_hash
