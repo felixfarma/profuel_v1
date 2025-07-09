@@ -1,5 +1,3 @@
-# app/routes/strava_routes.py
-
 import os
 import requests
 from flask import Blueprint, redirect, request, session, url_for
@@ -18,11 +16,11 @@ def connect_strava():
     Redirige al usuario a Strava para autorizar tu aplicación.
     """
     params = {
-        "client_id": STRAVA_CLIENT_ID,
+        "client_id":     STRAVA_CLIENT_ID,
         "response_type": "code",
-        "redirect_uri": url_for("strava.callback", _external=True),
+        "redirect_uri":  url_for("strava.callback", _external=True),
         "approval_prompt": "auto",
-        "scope": "activity:read_all"
+        "scope":          "activity:read_all"
     }
     url = f"{AUTHORIZE_URL}?{requests.compat.urlencode(params)}"
     return redirect(url)
@@ -30,18 +28,22 @@ def connect_strava():
 @strava_bp.route("/auth/strava/callback")
 def callback():
     """
-    Recibe el código de Strava, lo intercambia por un access token y lo guarda en sesión.
+    Recibe el código de Strava, lo intercambia por un access token y
+    lo guarda en sesión.
     """
     code = request.args.get("code")
     if not code:
         return "Error: no se recibió código de Strava", 400
 
-    resp = requests.post(TOKEN_URL, data={
-        "client_id":     STRAVA_CLIENT_ID,
-        "client_secret": STRAVA_CLIENT_SECRET,
-        "code":          code,
-        "grant_type":    "authorization_code"
-    })
+    resp = requests.post(
+        TOKEN_URL,
+        data={
+            "client_id":     STRAVA_CLIENT_ID,
+            "client_secret": STRAVA_CLIENT_SECRET,
+            "code":          code,
+            "grant_type":    "authorization_code"
+        }
+    )
     data = resp.json()
     access_token = data.get("access_token")
     if not access_token:
