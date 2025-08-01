@@ -36,4 +36,5 @@ class Meal(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    # Usar Session.get() en lugar de Query.get() para evitar la advertencia de SQLAlchemy
+    return db.session.get(User, int(user_id))
