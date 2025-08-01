@@ -29,23 +29,40 @@ def calcular_bmr(
 
     - "mifflin": Mifflin–St Jeor → requiere sexo ('M'/'F'), peso (kg),
       altura (cm), edad (años)
-    - "cunningham": Cunningham → requiere peso (kg), porcentaje_grasa (%)
+    - "cunningham": Cunningham → requiere peso (kg); opcionalmente porcentaje_grasa (%)
 
     Soporta llamadas a:
       calcular_bmr("mifflin", sexo='M', peso=70, altura=175, edad=25)
-      y calcular_bmr("cunningham", peso=70, porcentaje_grasa=15)
+      calcular_bmr("cunningham", peso=70, porcentaje_grasa=15)
+      calcular_bmr("cunningham", peso=70)  # asume masa magra 70%
     """
     key = formula.strip().lower()
+
     if key == "mifflin":
+        # Validación de parámetros
         if sexo is None or peso is None or altura is None or edad is None:
-            raise ValueError("Faltan parámetros para Mifflin–St Jeor")
-        ajuste = 5 if sexo.strip().upper() == "M" else -161
+            raise ValueError(
+                "Faltan parámetros para Mifflin–St Jeor: "
+                "sexo, peso, altura y edad son requeridos."
+            )
+        # Ajuste según sexo
+        s = sexo.strip().upper()
+        if s not in ("M", "F"):
+            raise ValueError("Sexo inválido: use 'M' o 'F'.")
+        ajuste = 5 if s == "M" else -161
+        # Fórmula Mifflin–St Jeor
         return 10 * peso + 6.25 * altura - 5 * edad + ajuste
 
     elif key == "cunningham":
-        if peso is None or porcentaje_grasa is None:
-            raise ValueError("Faltan parámetros para Cunningham")
-        masa_magra = peso * (1 - porcentaje_grasa / 100)
+        # Validación de peso
+        if peso is None:
+            raise ValueError("Faltan parámetros para Cunningham: peso es requerido.")
+        # Si no hay porcentaje, asumimos masa magra = 70% del peso
+        if porcentaje_grasa is None:
+            masa_magra = peso * 0.70
+        else:
+            masa_magra = peso * (1 - porcentaje_grasa / 100.0)
+        # Fórmula Cunningham
         return 500 * masa_magra
 
     else:
@@ -57,6 +74,8 @@ def calcular_tdee(bmr, factor_actividad):
     Calcula el gasto energético diario total (TDEE) multiplicando
     la BMR por el factor de actividad (float).
     """
+    if bmr is None or factor_actividad is None:
+        raise ValueError("BMR y factor de actividad son requeridos para TDEE.")
     return bmr * factor_actividad
 
 
@@ -83,7 +102,7 @@ def bmr_mifflin_st_jeor(sexo, peso, altura, edad):
     )
 
 
-def bmr_cunningham(peso, porcentaje_grasa):
+def bmr_cunningham(peso, porcentaje_grasa=None):
     """
     Alias para Cunningham, útil en tests directos.
     """

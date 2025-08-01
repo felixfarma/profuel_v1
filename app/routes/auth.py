@@ -1,6 +1,5 @@
 # app/routes/auth.py
 
-# import os
 from datetime import date
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -27,12 +26,16 @@ def register():
         password = request.form["password"]
 
         if User.query.filter_by(email=email).first():
-            flash("El usuario ya existe.")
-            return redirect(url_for("auth.register"))
+            flash("El usuario ya existe. Por favor, inicia sesión.")
+            return redirect(url_for("auth.login"))
 
-        new_user = User(email=email, password=generate_password_hash(password))
+        new_user = User(
+            email=email,
+            password=generate_password_hash(password)
+        )
         db.session.add(new_user)
         db.session.commit()
+
         flash("Registro exitoso. Ahora puedes iniciar sesión.")
         return redirect(url_for("auth.login"))
 
@@ -72,16 +75,23 @@ def dashboard():
         return redirect(url_for("auth.profile"))
 
     edad = calcular_edad(profile.fecha_nacimiento)
-    bmr = calcular_bmr(profile.sexo, profile.peso, profile.altura, edad)
+    bmr = calcular_bmr(
+        profile.formula_bmr,
+        sexo=profile.sexo,
+        peso=profile.peso,
+        altura=profile.altura,
+        edad=edad,
+        porcentaje_grasa=profile.porcentaje_grasa
+    )
     tdee = calcular_tdee(bmr, float(profile.actividad))
 
     hoy = date.today()
     meals = Meal.query.filter_by(user_id=current_user.id, date=hoy).all()
 
     total_proteinas = sum(m.protein for m in meals)
-    total_carbs = sum(m.carbs for m in meals)
-    total_grasas = sum(m.fat for m in meals)
-    total_kcal = sum(m.kcal for m in meals)
+    total_carbs    = sum(m.carbs   for m in meals)
+    total_grasas   = sum(m.fat     for m in meals)
+    total_kcal     = sum(m.kcal    for m in meals)
 
     return render_template(
         "dashboard.html",
@@ -103,20 +113,26 @@ def profile():
     form = ProfileForm()
     profile = Profile.query.filter_by(user_id=current_user.id).first()
 
+    # Carga datos si ya existe perfil
     if request.method == "GET" and profile:
-        form.sexo.data = profile.sexo
-        form.altura.data = profile.altura
-        form.peso.data = profile.peso
+        form.sexo.data             = profile.sexo
+        form.altura.data           = profile.altura
+        form.peso.data             = profile.peso
         form.fecha_nacimiento.data = profile.fecha_nacimiento
-        form.actividad.data = str(profile.actividad)
+        form.actividad.data        = str(profile.actividad)
+        form.formula_bmr.data      = profile.formula_bmr
+        form.porcentaje_grasa.data = profile.porcentaje_grasa
 
     if form.validate_on_submit():
         if not profile:
             profile = Profile(user_id=current_user.id)
         form.populate_obj(profile)
-        profile.actividad = float(form.actividad.data)
+        profile.actividad        = float(form.actividad.data)
+        profile.formula_bmr      = form.formula_bmr.data
+        profile.porcentaje_grasa = form.porcentaje_grasa.data or None
         db.session.add(profile)
         db.session.commit()
+
         flash("Perfil actualizado correctamente.")
         return redirect(url_for("auth.dashboard"))
 
@@ -128,7 +144,6 @@ def _compute_macros(food, qty, unit):
     Calcula kcal, proteína, carbohidratos y grasa en función
     de un alimento, cantidad y unidad (g, ml o unidad).
     """
-    # Determina factor
     if unit == food.default_unit and food.kcal_per_unit is not None:
         factor = qty
         base = "unit"
@@ -136,17 +151,16 @@ def _compute_macros(food, qty, unit):
         factor = qty / 100.0
         base = "100g"
 
-    # Obtiene valores base, usando 0 si None
     if base == "unit":
-        kcal_base = food.kcal_per_unit or 0
+        kcal_base    = food.kcal_per_unit or 0
         protein_base = food.protein_per_unit or 0
-        carbs_base = food.carbs_per_unit or 0
-        fat_base = food.fat_per_unit or 0
+        carbs_base   = food.carbs_per_unit or 0
+        fat_base     = food.fat_per_unit or 0
     else:
-        kcal_base = food.kcal_per_100g or 0
+        kcal_base    = food.kcal_per_100g or 0
         protein_base = food.protein_per_100g or 0
-        carbs_base = food.carbs_per_100g or 0
-        fat_base = food.fat_per_100g or 0
+        carbs_base   = food.carbs_per_100g or 0
+        fat_base     = food.fat_per_100g or 0
 
     return (
         kcal_base * factor,
@@ -160,17 +174,16 @@ def _compute_macros(food, qty, unit):
 @login_required
 def add_meal():
     if request.method == "POST":
-        # Recoge valores del formulario manual
         name = request.form.get("name", "").strip()
         try:
             qty = float(request.form.get("quantity", 0))
         except ValueError:
             flash("Cantidad inválida.")
             return redirect(url_for("auth.add_meal"))
-        unit = request.form.get("unit", "")
+
+        unit  = request.form.get("unit", "")
         mtype = request.form.get("type", "")
 
-        # Validaciones básicas
         if not name:
             flash("Nombre del alimento obligatorio.")
             return redirect(url_for("auth.add_meal"))
@@ -184,17 +197,14 @@ def add_meal():
             flash("Tipo de comida inválido.")
             return redirect(url_for("auth.add_meal"))
 
-        # Busca o crea el alimento en la tabla Foods
         food = Food.query.filter_by(name=name).first()
         if not food:
             food = Food(name=name, default_unit=unit, default_quantity=qty)
             db.session.add(food)
             db.session.commit()
 
-        # Calcula macros y kcal
         kcal, protein, carbs, fat = _compute_macros(food, qty, unit)
 
-        # Crea la comida
         meal = Meal(
             user_id=current_user.id,
             name=name,
