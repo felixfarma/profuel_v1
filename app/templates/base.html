@@ -1,21 +1,40 @@
-<!DOCTYPE html>
+<!-- app/templates/base.html -->
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Profuel</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profuel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>Profuel App</h1>
-    {% with messages = get_flashed_messages() %}
+  <nav>
+    <ul>
+      <li><a href="{{ url_for('main.index') }}">Inicio</a></li>
+      {% if current_user.is_authenticated %}
+        <li><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+        <li><a href="{{ url_for('nutrition.new_meal') }}">Añadir Comida</a></li>
+        <li><a href="{{ url_for('auth.profile') }}">Perfil</a></li>
+        <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
+      {% else %}
+        <li><a href="{{ url_for('auth.login') }}">Iniciar sesión</a></li>
+        <li><a href="{{ url_for('auth.register') }}">Registrarse</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <ul>
-          {% for message in messages %}
-            <li>{{ message }}</li>
+        <div class="flashes">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
           {% endfor %}
-        </ul>
+        </div>
       {% endif %}
     {% endwith %}
+
     {% block content %}{% endblock %}
+  </div>
 </body>
 </html>

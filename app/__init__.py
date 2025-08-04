@@ -23,7 +23,7 @@ def create_app():
     # 4. Asegura que la carpeta instance exista
     os.makedirs(app.instance_path, exist_ok=True)
 
-    # 5. Prepara URI absoluta para SQLite dentro de instance/
+    # 5. Construye URI absoluta para SQLite en instance/
     db_path = os.path.join(app.instance_path, "nutricional.db")
     default_db_uri = f"sqlite:///{db_path}"
 
@@ -34,7 +34,7 @@ def create_app():
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
-    # 7. Inicializa extensiones
+    # 7. Inicializa extensiones con la app
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
@@ -44,15 +44,21 @@ def create_app():
     from app.models.user import User, Profile, Meal
     from app.models.food import Food
 
-    # 9. Registra blueprints
+    # 9. Registra blueprints (solo aquí, sin volver a pasar url_prefix)
     from app.routes.auth import auth_routes
-    app.register_blueprint(auth_routes, url_prefix="")
+    app.register_blueprint(auth_routes)
 
     from app.routes.api import api
-    app.register_blueprint(api, url_prefix="/api")
+    app.register_blueprint(api)
 
     from app.routes.strava_routes import strava_bp
-    app.register_blueprint(strava_bp, url_prefix="/strava")
+    app.register_blueprint(strava_bp)
+
+    from app.routes.main import main as main_bp
+    app.register_blueprint(main_bp)
+
+    from app.routes.nutrition import nutrition as nutrition_bp
+    app.register_blueprint(nutrition_bp)
 
     # 10. Comandos personalizados CLI
     from app.commands import seed_foods

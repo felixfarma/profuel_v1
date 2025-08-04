@@ -1,64 +1,121 @@
-<!-- templates/dashboard.html -->
-
 {% extends 'base.html' %}
 
-{% block title %}Dashboard{% endblock %}
-
 {% block content %}
-<div class="container mt-4">
-  <h2>Bienvenido, {{ current_user.email }}</h2>
+  <h2>Dashboard de {{ current_user.email }}</h2>
+  <p><strong>Fecha:</strong> {{ hoy.strftime('%Y-%m-%d') }}</p>
+  <p><strong>Edad:</strong> {{ edad }} años</p>
+  <p><strong>BMR:</strong> {{ bmr }} kcal</p>
+  <p><strong>TDEE:</strong> {{ tdee }} kcal</p>
 
-  <!-- Indicadores generales -->
-  <div class="row mb-4">
-    <div class="col">
-      <strong>BMR:</strong> {{ bmr|round(1) }} kcal/d
+  <h3>Comidas de hoy</h3>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Hora</th><th>Alimento</th><th>Cantidad</th>
+        <th>Kcal</th><th>Proteína</th><th>Carbs</th>
+        <th>Grasas</th><th>Tipo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in meals %}
+        <tr>
+          <td>{{ m.time.strftime('%H:%M') }}</td>
+          <td>{{ m.food.name }}</td>
+          <td>{{ m.quantity }}</td>
+          <td>{{ m.calories }}</td>
+          <td>{{ m.protein }}</td>
+          <td>{{ m.carbs }}</td>
+          <td>{{ m.fats }}</td>
+          <td>{{ m.meal_type }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8">No hay comidas hoy.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h4>Totales diarios</h4>
+  <ul>
+    <li><strong>Kcal totales:</strong> {{ total_kcal }}</li>
+    <li><strong>Proteínas:</strong> {{ total_proteinas }} g</li>
+    <li><strong>Carbs:</strong> {{ total_carbs }} g</li>
+    <li><strong>Grasas:</strong> {{ total_grasas }} g</li>
+  </ul>
+
+  <hr>
+
+  <div class="row">
+    <div class="col-md-6">
+      <h5>Macros por comida</h5>
+      <canvas id="macroChart"></canvas>
     </div>
-    <div class="col">
-      <strong>TDEE:</strong> {{ tdee|round(1) }} kcal/d
-    </div>
-    <div class="col">
-      <strong>Total hoy:</strong> {{ total_kcal|round(1) }} kcal
+    <div class="col-md-6">
+      <h5>Calorías vs Objetivo</h5>
+      <canvas id="calorieChart"></canvas>
     </div>
   </div>
 
-  <!-- Listado de comidas del día -->
-  <h4>Comidas de hoy</h4>
-  {% if meals %}
-    <table class="table table-striped table-sm">
-      <thead>
-        <tr>
-          <th>Hora</th>
-          <th>Nombre</th>
-          <th>Tipo</th>
-          <th>Kcal</th>
-          <th>Proteína</th>
-          <th>Carbos</th>
-          <th>Grasas</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for meal in meals %}
-        <tr>
-          <td>{{ meal.date.strftime('%H:%M') if meal.date else '' }}</td>
-          <td>{{ meal.name }}</td>
-          <td>{{ meal.meal_type }}</td>
-          <td>{{ meal.kcal|round(1) }}</td>
-          <td>{{ meal.protein|round(1) }}</td>
-          <td>{{ meal.carbs|round(1) }}</td>
-          <td>{{ meal.fat|round(1) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p class="text-muted">
-      Aún no has añadido comidas hoy. 
-      <a href="{{ url_for('auth.add_meal') }}">Añadir ahora</a>
-    </p>
-  {% endif %}
+  <!-- Chart.js desde CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Configuración del gráfico de macros apilado
+    const macroCtx = document.getElementById('macroChart').getContext('2d');
+    new Chart(macroCtx, {
+      type: 'bar',
+      data: {
+        labels: {{ chart_labels|tojson }},
+        datasets: [
+          {
+            label: 'Proteínas (g)',
+            data: {{ chart_proteinas|tojson }},
+            backgroundColor: 'rgba(75, 192, 192, 0.6)'
+          },
+          {
+            label: 'Carbs (g)',
+            data: {{ chart_carbs|tojson }},
+            backgroundColor: 'rgba(54, 162, 235, 0.6)'
+          },
+          {
+            label: 'Grasas (g)',
+            data: {{ chart_grasas|tojson }},
+            backgroundColor: 'rgba(255, 206, 86, 0.6)'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            title: { display: true, text: 'Gramos' }
+          }
+        }
+      }
+    });
 
-  <a href="{{ url_for('auth.add_meal') }}" class="btn btn-primary mt-3">
-    Añadir comida
-  </a>
-</div>
+    // Configuración del gráfico de calorías vs objetivo
+    const calCtx = document.getElementById('calorieChart').getContext('2d');
+    new Chart(calCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Consumido', 'Objetivo'],
+        datasets: [{
+          label: 'Calorías',
+          data: {{ chart_calories|tojson }},
+          backgroundColor: ['rgba(255, 99, 132, 0.6)', 'rgba(153, 102, 255, 0.6)']
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'kcal' }
+          }
+        }
+      }
+    });
+  </script>
 {% endblock %}

@@ -5,10 +5,52 @@ from flask_login import login_required, current_user
 from datetime import date
 from app import db
 from app.models.food import Food
-from app.models.user import Meal
+from app.models.user import Meal, Profile
 from app.utils.off_api import search_off
+from app.utils.calculos import calcular_edad, calcular_bmr, calcular_tdee
 
 api = Blueprint("api", __name__, url_prefix="/api")
+
+
+# ----------------------------------------
+# NUEVO ENDPOINT: PERFIL NUTRICIONAL
+# ----------------------------------------
+@api.route("/profile", methods=["GET"])
+@login_required
+def get_profile():
+    """
+    Devuelve en JSON los datos del perfil del usuario autenticado,
+    junto con edad, BMR y TDEE calculados.
+    """
+    profile = Profile.query.filter_by(user_id=current_user.id).first()
+    if not profile:
+        return jsonify({"error": "Perfil no encontrado"}), 404
+
+    # Cálculos
+    edad = calcular_edad(profile.fecha_nacimiento)
+    bmr = calcular_bmr(
+        profile.formula_bmr,
+        sexo=profile.sexo,
+        peso=profile.peso,
+        altura=profile.altura,
+        edad=edad,
+        porcentaje_grasa=profile.porcentaje_grasa,
+    )
+    tdee = calcular_tdee(bmr, float(profile.actividad))
+
+    return jsonify({
+        "user_id": current_user.id,
+        "sexo": profile.sexo,
+        "altura": profile.altura,
+        "peso": profile.peso,
+        "fecha_nacimiento": profile.fecha_nacimiento.isoformat(),
+        "actividad": profile.actividad,
+        "formula_bmr": profile.formula_bmr,
+        "porcentaje_grasa": profile.porcentaje_grasa,
+        "edad": edad,
+        "bmr": bmr,
+        "tdee": tdee,
+    }), 200
 
 
 # ----------------------------------------
