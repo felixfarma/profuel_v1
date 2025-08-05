@@ -1,29 +1,21 @@
+<!-- app/templates/add_meal.html -->
 {% extends 'base.html' %}
 {% block title %}Añadir comida{% endblock %}
 {% block content %}
 <div class="container mt-4">
   <h2 class="mb-4">Añadir comida</h2>
 
-  <!-- Mensajes flash -->
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, msg in messages %}
-        <div class="alert alert-{{ category }} mb-2">{{ msg }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-
-  <form method="POST" id="add-meal-form">
+  <!-- Formulario principal -->
+  <form id="add-meal-form" method="POST">
     <!-- Buscador de alimentos -->
     <div class="mb-3 position-relative">
       <label for="food-search" class="form-label">Buscar alimento</label>
-      <input 
-        type="text" 
-        id="food-search" 
-        class="form-control" 
-        placeholder="Escribe al menos 2 letras..."
-        autocomplete="off">
-      <ul id="suggestions" 
+      <input type="text"
+             id="food-search"
+             class="form-control"
+             placeholder="Escribe al menos 2 letras"
+             autocomplete="off">
+      <ul id="suggestions"
           class="list-group position-absolute w-100"
           style="z-index:1000; max-height:200px; overflow-y:auto;"></ul>
       <input type="hidden" name="food_id" id="food-id">
@@ -32,14 +24,13 @@
     <!-- Cantidad -->
     <div class="mb-3">
       <label for="quantity" class="form-label">Cantidad</label>
-      <input 
-        type="number" 
-        name="quantity" 
-        id="quantity" 
-        class="form-control" 
-        step="any" 
-        min="0.1"
-        required>
+      <input type="number"
+             name="quantity"
+             id="quantity"
+             class="form-control"
+             step="any"
+             min="0.01"
+             required>
     </div>
 
     <!-- Tipo de comida -->
@@ -56,24 +47,87 @@
     <!-- Botones -->
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Añadir al diario</button>
-      <button type="button" id="btn-create-food" class="btn btn-secondary">+ Crear alimento</button>
+      <button type="button"
+              class="btn btn-secondary"
+              data-bs-toggle="modal"
+              data-bs-target="#foodModal">
+        + Crear alimento
+      </button>
       <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Cancelar</a>
     </div>
   </form>
 </div>
 
+<!-- Modal de creación de alimento -->
+<div class="modal fade" id="foodModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form id="create-food-form">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Crear nuevo alimento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Nombre, unidad y cantidad base -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Nombre</label>
+              <input type="text" id="food-name" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Unidad</label>
+              <select id="food-unit" class="form-select">
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="unit">unidad</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Cantidad base</label>
+              <input type="number" id="food-quantity" class="form-control" step="any" value="100" required>
+            </div>
+          </div>
+
+          <!-- Macros por 100g -->
+          <div class="row g-3 mb-3">
+            <div class="col"><label class="form-label">Kcal/100g</label><input type="number" id="food-kcal100" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Prot/100g</label><input type="number" id="food-prot100" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Carbs/100g</label><input type="number" id="food-carbs100" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Fat/100g</label><input type="number" id="food-fat100" class="form-control" step="any"></div>
+          </div>
+
+          <!-- Macros por unidad -->
+          <div class="row g-3">
+            <div class="col"><label class="form-label">Kcal/unidad</label><input type="number" id="food-kcal1" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Prot/unidad</label><input type="number" id="food-prot1" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Carbs/unidad</label><input type="number" id="food-carbs1" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Fat/unidad</label><input type="number" id="food-fat1" class="form-control" step="any"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button"
+                  class="btn btn-secondary"
+                  data-bs-dismiss="modal">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary">Guardar alimento</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const searchInput = document.getElementById('food-search');
+  // Autocompletado de alimentos
+  const searchInput    = document.getElementById('food-search');
   const suggestionsBox = document.getElementById('suggestions');
-  const foodIdInput = document.getElementById('food-id');
+  const foodIdInput    = document.getElementById('food-id');
   let debounceTimer;
 
-  // Autocompletado de alimentos
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
-
     if (q.length < 2) {
       suggestionsBox.innerHTML = '';
       foodIdInput.value = '';
@@ -85,41 +139,70 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(r => r.json())
         .then(data => {
           suggestionsBox.innerHTML = '';
-
-          if (data.foods.length === 0) {
+          if (!data.foods.length) {
             const li = document.createElement('li');
             li.className = 'list-group-item text-muted';
-            li.textContent = "No se encontraron alimentos.";
-            suggestionsBox.appendChild(li);
+            li.textContent = 'No se encontraron alimentos.';
+            suggestionsBox.append(li);
             return;
           }
-
           data.foods.forEach(item => {
             const li = document.createElement('li');
             li.className = 'list-group-item list-group-item-action';
-            li.innerHTML = `<strong>${item.name}</strong> <small class="text-muted">(${item.macros_per_100g.kcal || 0} kcal/100g)</small>`;
+            li.innerHTML = `<strong>${item.name}</strong> <small class="text-muted">(${item.macros_per_100g.kcal} kcal/100g)</small>`;
             li.style.cursor = 'pointer';
             li.onclick = () => {
               searchInput.value = item.name;
               foodIdInput.value = item.id;
               suggestionsBox.innerHTML = '';
             };
-            suggestionsBox.appendChild(li);
+            suggestionsBox.append(li);
           });
         });
     }, 300);
   });
 
-  // Cerrar sugerencias si se hace clic fuera
   document.addEventListener('click', e => {
     if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
       suggestionsBox.innerHTML = '';
     }
   });
 
-  // Botón "Crear alimento" → por ahora solo placeholder
-  document.getElementById('btn-create-food').addEventListener('click', () => {
-    alert('Aquí se abrirá el modal para crear un nuevo alimento.');
+  // Crear alimento vía API desde el modal
+  const createForm = document.getElementById('create-food-form');
+  createForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const payload = {
+      name: document.getElementById('food-name').value.trim(),
+      default_unit: document.getElementById('food-unit').value,
+      default_quantity: parseFloat(document.getElementById('food-quantity').value),
+      kcal_per_100g: parseFloat(document.getElementById('food-kcal100').value) || 0,
+      protein_per_100g: parseFloat(document.getElementById('food-prot100').value) || 0,
+      carbs_per_100g: parseFloat(document.getElementById('food-carbs100').value) || 0,
+      fat_per_100g: parseFloat(document.getElementById('food-fat100').value) || 0,
+      kcal_per_unit: parseFloat(document.getElementById('food-kcal1').value) || null,
+      protein_per_unit: parseFloat(document.getElementById('food-prot1').value) || null,
+      carbs_per_unit: parseFloat(document.getElementById('food-carbs1').value) || null,
+      fat_per_unit: parseFloat(document.getElementById('food-fat1').value) || null
+    };
+
+    fetch('/api/foods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
+    .then(food => {
+      // Selecciona el alimento recién creado
+      searchInput.value = food.name;
+      foodIdInput.value = food.id;
+      // Cierra el modal
+      const modalEl = document.getElementById('foodModal');
+      bootstrap.Modal.getInstance(modalEl).hide();
+    })
+    .catch(err => {
+      alert(err.error || 'Error al crear el alimento');
+    });
   });
 });
 </script>
