@@ -1,40 +1,53 @@
 # app/routes/nutrition.py
 
+from datetime import date, datetime
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from app import db
-from app.forms.meal_form import MealForm
 from app.models.user import Meal
 from app.models.food import Food
 
 nutrition = Blueprint("nutrition", __name__)
 
+# ===============================
+# RUTA PARA AÑADIR COMIDAS (MEALS)
+# ===============================
 @nutrition.route("/meals/new", methods=["GET", "POST"])
 @login_required
 def new_meal():
-    form = MealForm()
-    if form.validate_on_submit():
-        # 1) Obtén el Food a partir del hidden field
-        food = Food.query.get(int(form.food_id.data))
-        if not food:
-            flash("Alimento no encontrado. Elige uno de la lista desplegable.", "warning")
+    if request.method == "POST":
+        food_id = request.form.get("food_id")
+        quantity = request.form.get("quantity")
+        meal_type = request.form.get("meal_type")
+
+        # Validar campos obligatorios
+        if not food_id or not quantity:
+            flash("Debes seleccionar un alimento y una cantidad válida.", "warning")
             return redirect(url_for("nutrition.new_meal"))
 
-        # 2) Crea y asocia el usuario y el alimento
+        food = Food.query.get(int(food_id))
+        if not food:
+            flash("El alimento seleccionado no existe.", "danger")
+            return redirect(url_for("nutrition.new_meal"))
+
+        # Crear la comida
         meal = Meal(
             user_id=current_user.id,
             food_id=food.id,
-            date=form.date.data,
-            time=form.time.data,
-            quantity=form.quantity.data,
-            meal_type=form.meal_type.data
+            date=date.today(),
+            time=datetime.utcnow().time(),
+            quantity=float(quantity),
+            meal_type=meal_type
         )
-        meal.food = food  # asegúrate de que la relación no sea None
+
+        meal.food = food  # Relación para recálculo
         meal._recalc_caches()
 
         db.session.add(meal)
         db.session.commit()
+
         flash("Comida añadida correctamente.", "success")
         return redirect(url_for("main.dashboard"))
 
-    return render_template("add_meal.html", form=form)
+    # GET → Renderizar la vista principal de añadir comida
+    return render_template("add_meal.html")

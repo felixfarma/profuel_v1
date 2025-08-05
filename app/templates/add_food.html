@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Añadir alimento{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Añadir alimento</h2>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+        <div class="alert alert-{{ category }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.name.label }} {{ form.name(class="form-control") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.default_unit.label }} {{ form.default_unit(class="form-select") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.default_quantity.label }} {{ form.default_quantity(class="form-control") }}
+    </div>
+
+    <hr>
+    <h5>Valores por 100g</h5>
+    <div class="row">
+      <div class="col">{{ form.kcal_per_100g.label }} {{ form.kcal_per_100g(class="form-control") }}</div>
+      <div class="col">{{ form.protein_per_100g.label }} {{ form.protein_per_100g(class="form-control") }}</div>
+      <div class="col">{{ form.carbs_per_100g.label }} {{ form.carbs_per_100g(class="form-control") }}</div>
+      <div class="col">{{ form.fat_per_100g.label }} {{ form.fat_per_100g(class="form-control") }}</div>
+    </div>
+
+    <hr>
+    <h5>Valores por unidad (opcional)</h5>
+    <div class="row">
+      <div class="col">{{ form.kcal_per_unit.label }} {{ form.kcal_per_unit(class="form-control") }}</div>
+      <div class="col">{{ form.protein_per_unit.label }} {{ form.protein_per_unit(class="form-control") }}</div>
+      <div class="col">{{ form.carbs_per_unit.label }} {{ form.carbs_per_unit(class="form-control") }}</div>
+      <div class="col">{{ form.fat_per_unit.label }} {{ form.fat_per_unit(class="form-control") }}</div>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-3">{{ form.submit.label.text }}</button>
+  </form>
+</div>
+{% endblock %}

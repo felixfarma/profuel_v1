@@ -9,54 +9,49 @@ from app.models.food import Food
 @with_appcontext
 def seed_foods():
     """
-    Pobla la base de datos con alimentos de ejemplo.
-    Úsalo con: flask seed_foods
+    Poblar la base de datos con alimentos de ejemplo.
     """
     sample_foods = [
         {
-            "name": "Manzana",
-            "calories_per_unit": 52,
-            "protein_per_unit": 0.3,
-            "carbs_per_unit": 14,
-            "fats_per_unit": 0.2,
-            "default_unit": "unit",
-            "default_quantity": 1
+            "name": "Leche",
+            "kcal_per_100g": 42,
+            "protein_per_100g": 3.4,
+            "carbs_per_100g": 5,
+            "fat_per_100g": 1,
+            "default_unit": "ml",
+            "default_quantity": 100
         },
         {
-            "name": "Banana",
-            "calories_per_unit": 89,
-            "protein_per_unit": 1.1,
-            "carbs_per_unit": 23,
-            "fats_per_unit": 0.3,
-            "default_unit": "unit",
-            "default_quantity": 1
-        },
-        {
-            "name": "Pechuga de pollo",
-            "calories_per_unit": None,
-            "protein_per_unit": None,
-            "carbs_per_unit": None,
-            "fats_per_unit": None,
+            "name": "Pan",
+            "kcal_per_100g": 265,
+            "protein_per_100g": 9,
+            "carbs_per_100g": 49,
+            "fat_per_100g": 3.2,
             "default_unit": "g",
             "default_quantity": 100
         },
-        # Añade más alimentos de ejemplo si lo deseas...
+        {
+            "name": "Huevo",
+            "kcal_per_unit": 68,
+            "protein_per_unit": 6,
+            "carbs_per_unit": 0.6,
+            "fat_per_unit": 4.8,
+            "default_unit": "unit",
+            "default_quantity": 1
+        }
     ]
 
     added = 0
-    for f in sample_foods:
-        if not Food.query.filter_by(name=f["name"]).first():
-            food = Food(
-                name=f["name"],
-                calories_per_unit=f["calories_per_unit"],
-                protein_per_unit=f["protein_per_unit"],
-                carbs_per_unit=f["carbs_per_unit"],
-                fats_per_unit=f["fats_per_unit"],
-                default_unit=f["default_unit"],
-                default_quantity=f["default_quantity"]
-            )
+    for data in sample_foods:
+        existing_food = Food.query.filter_by(name=data["name"]).first()
+        if not existing_food:
+            # Solo pasamos las claves que existen en el modelo Food
+            valid_keys = {key: value for key, value in data.items() if hasattr(Food, key)}
+            food = Food(**valid_keys)
             db.session.add(food)
             added += 1
+        else:
+            click.echo(f"'{data['name']}' ya existe, no se añadió.")
 
     db.session.commit()
-    click.echo(f"Alimentos de muestra añadidos: {added}")
+    click.echo(f"Se añadieron {added} alimentos nuevos.")

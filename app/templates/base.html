@@ -1,40 +1,48 @@
-<!-- app/templates/base.html -->
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Profuel</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <nav>
-    <ul>
-      <li><a href="{{ url_for('main.index') }}">Inicio</a></li>
-      {% if current_user.is_authenticated %}
-        <li><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
-        <li><a href="{{ url_for('nutrition.new_meal') }}">Añadir Comida</a></li>
-        <li><a href="{{ url_for('auth.profile') }}">Perfil</a></li>
-        <li><a href="{{ url_for('auth.logout') }}">Salir</a></li>
-      {% else %}
-        <li><a href="{{ url_for('auth.login') }}">Iniciar sesión</a></li>
-        <li><a href="{{ url_for('auth.register') }}">Registrarse</a></li>
-      {% endif %}
-    </ul>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{{ url_for('main.index') }}">Profuel</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          {% if current_user.is_authenticated %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('nutrition.new_meal') }}">Añadir Comida</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.profile') }}">Perfil</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">Salir</a></li>
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">Iniciar sesión</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">Registrarse</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
   </nav>
 
   <div class="container">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="flashes">
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-          {% endfor %}
-        </div>
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
       {% endif %}
     {% endwith %}
-
     {% block content %}{% endblock %}
   </div>
+
+  <!-- Bootstrap Bundle JS (incluye Popper) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
