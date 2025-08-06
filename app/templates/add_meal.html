@@ -1,6 +1,7 @@
 <!-- app/templates/add_meal.html -->
 {% extends 'base.html' %}
-{% block title %}Añadir comida{% endblock %}
+{% block title %}Diario de hoy{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
   <h2 class="mb-4">Diario de hoy</h2>
@@ -10,18 +11,20 @@
     <h5>Comidas añadidas</h5>
     <div id="today-meals-list">
       {% for m in meals %}
-      <div class="d-flex justify-content-between align-items-center py-1 border-bottom" data-meal-id="{{ m.id }}">
-        <div>
-          <span class="meal-time">{{ m.time }}</span> —
-          <span class="meal-name">{{ m.food.name }}</span>
-          (<span class="meal-quantity">{{ m.quantity }}</span>)
+        <div class="d-flex justify-content-between align-items-center py-1 border-bottom meal-row" data-meal-id="{{ m.id }}">
+          <div>
+            <strong class="meal-time">{{ m.time }}</strong> —
+            {{ m.food.name }}
+            (<span class="meal-quantity">{{ m.quantity }}</span> {{ m.food.default_unit }})
+          </div>
+          <div class="d-flex align-items-center">
+            <span class="me-3">
+              <span class="meal-calories">{{ m.calories }}</span> kcal
+            </span>
+            <button class="btn btn-sm btn-outline-secondary me-1 edit-meal">✏️</button>
+            <button class="btn btn-sm btn-outline-danger delete-meal">🗑️</button>
+          </div>
         </div>
-        <div>
-          <span class="meal-calories">{{ m.calories }}</span> kcal
-          <button class="btn btn-sm btn-link edit-meal">✏️</button>
-          <button class="btn btn-sm btn-link text-danger delete-meal">🗑️</button>
-        </div>
-      </div>
       {% endfor %}
     </div>
   </div>
@@ -151,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const foodIdInput    = document.getElementById('food-id');
   let debounceTimer;
 
-  // Autocompletado
+  // 1) Autocomplete
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
@@ -191,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Crear alimento desde modal
+  // 2) Crear alimento desde modal
   document.getElementById('create-food-form').addEventListener('submit', e => {
     e.preventDefault();
     const payload = {
@@ -221,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(err => alert(err.error || 'Error al crear el alimento'));
   });
 
-  // Añadir comida (POST AJAX)
+  // 3) Añadir comida (POST AJAX)
   document.getElementById('add-meal-form').addEventListener('submit', e => {
     e.preventDefault();
     const payload = {
@@ -231,43 +234,35 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     fetch('/api/meals', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
-    .then(({ meal }) => {
-      // Añadir fila nueva
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+      if (status !== 201) {
+        const msg = data.message || Object.values(data.fields||{})[0] || 'Error añadiendo comida';
+        return alert(msg);
+      }
+      const m = data.meal;
+      // Añadir fila al listado
       const list = document.getElementById('today-meals-list');
       const row = document.createElement('div');
-      row.className = 'd-flex justify-content-between align-items-center py-1 border-bottom';
-      row.setAttribute('data-meal-id', meal.id);
+      row.className = 'd-flex justify-content-between align-items-center py-1 border-bottom meal-row';
+      row.dataset.mealId = m.id;
       row.innerHTML = `
         <div>
-          <span class="meal-time">${meal.time}</span> —
-          <span class="meal-name">${meal.food.name}</span>
-          (<span class="meal-quantity">${meal.quantity}</span>)
+          <strong>${m.time}</strong> —
+          ${m.food.name} (<span class="meal-quantity">${m.quantity}</span> ${m.food.default_unit})
         </div>
-        <div>
-          <span class="meal-calories">${meal.calories}</span> kcal
-          <button class="btn btn-sm btn-link edit-meal">✏️</button>
-          <button class="btn btn-sm btn-link text-danger delete-meal">🗑️</button>
+        <div class="d-flex align-items-center">
+          <span class="me-3"><span class="meal-calories">${m.calories}</span> kcal</span>
+          <button class="btn btn-sm btn-outline-secondary me-1 edit-meal">✏️</button>
+          <button class="btn btn-sm btn-outline-danger delete-meal">🗑️</button>
         </div>`;
       list.appendChild(row);
-
-      // Actualizar totales
-      document.getElementById('total-kcal').textContent =
-        parseInt(document.getElementById('total-kcal').textContent) + meal.calories;
-      document.getElementById('total-protein').textContent =
-        parseInt(document.getElementById('total-protein').textContent) + meal.protein;
-      document.getElementById('total-carbs').textContent =
-        parseInt(document.getElementById('total-carbs').textContent) + meal.carbs;
-      document.getElementById('total-fats').textContent =
-        parseInt(document.getElementById('total-fats').textContent) + meal.fats;
-
-      // Reset form
+      recalcTotals();
+      attachHandlers(row);
+      // reset
       searchInput.value = '';
       foodIdInput.value = '';
       document.getElementById('quantity').value = '';
@@ -276,59 +271,64 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(err => alert(err.error || 'Error al añadir comida'));
   });
 
-  // Borrar comida (DELETE AJAX)
+  // 4) Borrar y editar
   document.getElementById('today-meals-list').addEventListener('click', e => {
-    if (!e.target.matches('.delete-meal')) return;
-    const row = e.target.closest('[data-meal-id]');
-    const id  = row.dataset.mealId;
-    fetch(`/api/meals/${id}`, { method: 'DELETE' })
-      .then(r => {
-        if (r.ok) {
-          const kcal = parseInt(row.querySelector('.meal-calories').textContent);
-          document.getElementById('total-kcal').textContent =
-            parseInt(document.getElementById('total-kcal').textContent) - kcal;
-          row.remove();
-        } else {
-          return r.json().then(err => Promise.reject(err));
-        }
-      })
-      .catch(err => alert(err.error || 'Error al borrar comida'));
-  });
-
-  // Editar comida (PUT AJAX)
-  document.getElementById('today-meals-list').addEventListener('click', e => {
-    if (!e.target.matches('.edit-meal')) return;
-    const row        = e.target.closest('[data-meal-id]');
-    const id         = row.dataset.mealId;
-    const qtySpan    = row.querySelector('.meal-quantity');
-    const calSpan    = row.querySelector('.meal-calories');
-    const oldQty     = parseFloat(qtySpan.textContent);
-    const oldCal     = parseInt(calSpan.textContent);
-    const newQtyStr  = prompt('Nueva cantidad:', oldQty);
-    if (newQtyStr === null) return;
-    const newQty = parseFloat(newQtyStr);
-    if (isNaN(newQty) || newQty <= 0) {
-      return alert('Cantidad inválida');
+    const row = e.target.closest('.meal-row');
+    if (!row) return;
+    const id = row.dataset.mealId;
+    // Delete
+    if (e.target.matches('.delete-meal')) {
+      if (!confirm('¿Eliminar esta comida?')) return;
+      fetch(`/api/meals/${id}`, { method: 'DELETE' })
+        .then(r => {
+          if (r.ok) {
+            const kcal = parseInt(row.querySelector('.meal-calories').textContent);
+            row.remove();
+            document.getElementById('total-kcal').textContent =
+              parseInt(document.getElementById('total-kcal').textContent) - kcal;
+          } else {
+            r.json().then(d => alert(d.message || 'Error al borrar'));
+          }
+        });
     }
-
-    fetch(`/api/meals/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify({ quantity: newQty })
-    })
-    .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
-    .then(({ meal }) => {
-      qtySpan.textContent = meal.quantity;
-      calSpan.textContent = meal.calories;
-      const diff = meal.calories - oldCal;
-      document.getElementById('total-kcal').textContent =
-        parseInt(document.getElementById('total-kcal').textContent) + diff;
-    })
-    .catch(err => alert(err.error || 'Error al editar comida'));
+    // Edit
+    if (e.target.matches('.edit-meal')) {
+      const qtySpan = row.querySelector('.meal-quantity');
+      const calSpan = row.querySelector('.meal-calories');
+      const oldQty  = parseFloat(qtySpan.textContent);
+      const oldCal  = parseInt(calSpan.textContent);
+      const n       = prompt('Nueva cantidad:', oldQty);
+      if (n === null) return;
+      const newQty = parseFloat(n);
+      if (isNaN(newQty)||newQty<=0) return alert('Cantidad inválida');
+      fetch(`/api/meals/${id}`, {
+        method: 'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({quantity: newQty})
+      })
+      .then(r => r.json().then(d=>({status:r.status,d})))
+      .then(({status,d}) => {
+        if (status!==200) return alert(d.message||Object.values(d.fields||{})[0]||'Error al editar');
+        qtySpan.textContent = d.meal.quantity;
+        calSpan.textContent = d.meal.calories;
+        const diff = d.meal.calories - oldCal;
+        document.getElementById('total-kcal').textContent =
+          parseInt(document.getElementById('total-kcal').textContent) + diff;
+      });
+    }
   });
+
+  // helpers
+  function recalcTotals(){
+    let tk=0;
+    document.querySelectorAll('.meal-row').forEach(r=>{
+      tk+=parseInt(r.querySelector('.meal-calories').textContent);
+    });
+    document.getElementById('total-kcal').textContent = tk;
+  }
+  function attachHandlers(row){
+    // no-op: delegation covers dynamic rows
+  }
 });
 </script>
 {% endblock %}
