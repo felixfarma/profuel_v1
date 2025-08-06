@@ -3,11 +3,34 @@
 {% block title %}Añadir comida{% endblock %}
 {% block content %}
 <div class="container mt-4">
-  <h2 class="mb-4">Añadir comida</h2>
+  <h2 class="mb-4">Diario de hoy</h2>
 
-  <!-- Formulario principal -->
-  <form id="add-meal-form" method="POST">
-    <!-- Buscador de alimentos -->
+  <!-- Listado de comidas de hoy -->
+  <div class="mb-4">
+    <h5>Comidas añadidas</h5>
+    <div id="today-meals-list">
+      {% for m in meals %}
+        <div class="d-flex justify-content-between py-1 border-bottom">
+          <div>{{ m.time }} — {{ m.food.name }} ({{ m.quantity }})</div>
+          <div>{{ m.calories }} kcal</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Totales -->
+  <div class="mb-4">
+    <h5>Totales</h5>
+    <ul class="list-unstyled">
+      <li>Kcal: <span id="total-kcal">{{ total_kcal }}</span></li>
+      <li>Proteínas: <span id="total-protein">{{ total_protein }}</span> g</li>
+      <li>Carbs: <span id="total-carbs">{{ total_carbs }}</span> g</li>
+      <li>Grasas: <span id="total-fats">{{ total_fats }}</span> g</li>
+    </ul>
+  </div>
+
+  <!-- Formulario AJAX de añadir comida -->
+  <form id="add-meal-form">
     <div class="mb-3 position-relative">
       <label for="food-search" class="form-label">Buscar alimento</label>
       <input type="text"
@@ -21,7 +44,6 @@
       <input type="hidden" name="food_id" id="food-id">
     </div>
 
-    <!-- Cantidad -->
     <div class="mb-3">
       <label for="quantity" class="form-label">Cantidad</label>
       <input type="number"
@@ -33,7 +55,6 @@
              required>
     </div>
 
-    <!-- Tipo de comida -->
     <div class="mb-3">
       <label for="meal_type" class="form-label">Tipo de comida</label>
       <select name="meal_type" id="meal_type" class="form-select" required>
@@ -44,7 +65,6 @@
       </select>
     </div>
 
-    <!-- Botones -->
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Añadir al diario</button>
       <button type="button"
@@ -53,7 +73,7 @@
               data-bs-target="#foodModal">
         + Crear alimento
       </button>
-      <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Cancelar</a>
+      <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Volver</a>
     </div>
   </form>
 </div>
@@ -68,7 +88,6 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <!-- Nombre, unidad y cantidad base -->
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label class="form-label">Nombre</label>
@@ -87,16 +106,12 @@
               <input type="number" id="food-quantity" class="form-control" step="any" value="100" required>
             </div>
           </div>
-
-          <!-- Macros por 100g -->
           <div class="row g-3 mb-3">
             <div class="col"><label class="form-label">Kcal/100g</label><input type="number" id="food-kcal100" class="form-control" step="any"></div>
             <div class="col"><label class="form-label">Prot/100g</label><input type="number" id="food-prot100" class="form-control" step="any"></div>
             <div class="col"><label class="form-label">Carbs/100g</label><input type="number" id="food-carbs100" class="form-control" step="any"></div>
             <div class="col"><label class="form-label">Fat/100g</label><input type="number" id="food-fat100" class="form-control" step="any"></div>
           </div>
-
-          <!-- Macros por unidad -->
           <div class="row g-3">
             <div class="col"><label class="form-label">Kcal/unidad</label><input type="number" id="food-kcal1" class="form-control" step="any"></div>
             <div class="col"><label class="form-label">Prot/unidad</label><input type="number" id="food-prot1" class="form-control" step="any"></div>
@@ -119,12 +134,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  // Autocompletado de alimentos
   const searchInput    = document.getElementById('food-search');
   const suggestionsBox = document.getElementById('suggestions');
   const foodIdInput    = document.getElementById('food-id');
   let debounceTimer;
 
+  // Autocompletado
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
@@ -168,9 +183,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Crear alimento vía API desde el modal
-  const createForm = document.getElementById('create-food-form');
-  createForm.addEventListener('submit', e => {
+  // Crear alimento desde modal
+  document.getElementById('create-food-form').addEventListener('submit', e => {
     e.preventDefault();
     const payload = {
       name: document.getElementById('food-name').value.trim(),
@@ -193,16 +207,59 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
     .then(food => {
-      // Selecciona el alimento recién creado
       searchInput.value = food.name;
       foodIdInput.value = food.id;
-      // Cierra el modal
       const modalEl = document.getElementById('foodModal');
       bootstrap.Modal.getInstance(modalEl).hide();
     })
-    .catch(err => {
-      alert(err.error || 'Error al crear el alimento');
-    });
+    .catch(err => alert(err.error || 'Error al crear el alimento'));
+  });
+
+  // AJAX para añadir comida
+  document.getElementById('add-meal-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const payload = {
+      food_id: document.getElementById('food-id').value,
+      quantity: parseFloat(document.getElementById('quantity').value),
+      meal_type: document.getElementById('meal_type').value
+    };
+
+    fetch('/meals/new', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(r => r.ok
+      ? r.json()
+      : r.json().then(err => Promise.reject(err)))
+    .then(m => {
+      // Añadir fila
+      const list = document.getElementById('today-meals-list');
+      const row = document.createElement('div');
+      row.className = 'd-flex justify-content-between py-1 border-bottom';
+      row.innerHTML = `<div>${m.time} — ${m.food.name} (${m.quantity})</div><div>${m.calories} kcal</div>`;
+      list.append(row);
+
+      // Actualizar totales
+      document.getElementById('total-kcal').textContent =
+        parseInt(document.getElementById('total-kcal').textContent) + m.calories;
+      document.getElementById('total-protein').textContent =
+        parseInt(document.getElementById('total-protein').textContent) + m.protein;
+      document.getElementById('total-carbs').textContent =
+        parseInt(document.getElementById('total-carbs').textContent) + m.carbs;
+      document.getElementById('total-fats').textContent =
+        parseInt(document.getElementById('total-fats').textContent) + m.fats;
+
+      // Reset form
+      document.getElementById('food-search').value = '';
+      document.getElementById('food-id').value = '';
+      document.getElementById('quantity').value = '';
+      document.getElementById('suggestions').innerHTML = '';
+    })
+    .catch(err => alert(err.error || 'Error al añadir comida'));
   });
 });
 </script>
