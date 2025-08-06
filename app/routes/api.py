@@ -1,7 +1,7 @@
 # app/routes/api.py
 
 from datetime import date, datetime
-from flask import Blueprint, request, jsonify, url_for, abort
+from flask import Blueprint, request, jsonify, abort
 from flask_login import login_required, current_user
 from app import db
 from app.models.food import Food
@@ -66,13 +66,11 @@ def _compute_macros(food: Food, qty: float, unit: str):
     """
     if unit == food.default_unit and food.kcal_per_unit is not None:
         factor = qty
-        base = "unit"
     else:
         factor = qty / 100.0
-        base = "100g"
 
-    if base == "unit":
-        kcal_base    = food.kcal_per_unit or 0
+    if unit == food.default_unit and food.kcal_per_unit is not None:
+        kcal_base    = food.kcal_per_unit
         protein_base = food.protein_per_unit or 0
         carbs_base   = food.carbs_per_unit or 0
         fat_base     = food.fat_per_unit or 0
@@ -99,7 +97,7 @@ def _compute_macros(food: Food, qty: float, unit: str):
 def get_profile():
     profile = Profile.query.filter_by(user_id=current_user.id).first()
     if not profile:
-        return jsonify({"error": "Perfil no encontrado"}), 404
+        return jsonify(error="ProfileNotFound"), 404
 
     edad = calcular_edad(profile.fecha_nacimiento)
     bmr  = calcular_bmr(
@@ -133,13 +131,17 @@ def update_profile():
     data = request.get_json() or {}
     profile = Profile.query.filter_by(user_id=current_user.id).first()
     if not profile:
-        abort(404, "Perfil no encontrado")
+        return jsonify(error="ProfileNotFound"), 404
 
-    for field in ("sexo", "altura", "peso", "fecha_nacimiento", "actividad", "formula_bmr", "porcentaje_grasa"):
+    for field in (
+        "sexo", "altura", "peso",
+        "fecha_nacimiento", "actividad",
+        "formula_bmr", "porcentaje_grasa"
+    ):
         if field in data:
             setattr(profile, field, data[field])
     db.session.commit()
-    return jsonify({"message": "Perfil actualizado"}), 200
+    return jsonify(message="Perfil actualizado"), 200
 
 
 # =====================
@@ -154,15 +156,12 @@ def get_foods():
     ?search=term
     """
     q = request.args.get("search", "").strip()
-    foods_local = []
+    local = []
     if q:
-        foods_local = Food.query.filter(Food.name.ilike(f"%{q}%")).limit(50).all()
+        local = Food.query.filter(Food.name.ilike(f"%{q}%")).limit(50).all()
 
-    if foods_local:
-        return jsonify(
-            foods=[_food_to_dict(f) for f in foods_local],
-            suggestions=[]
-        ), 200
+    if local:
+        return jsonify(foods=[_food_to_dict(f) for f in local], suggestions=[]), 200
 
     suggestions = []
     if q:
@@ -181,8 +180,15 @@ def create_food():
                opcional: kcal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit
     """
     data = request.get_json() or {}
-    required = ["name", "kcal_per_100g", "protein_per_100g", "carbs_per_100g", "fat_per_100g", "default_unit", "default_quantity"]
-    errors = {f: "Obligatorio" for f in required if not data.get(f) and data.get(f) != 0}
+    required = [
+        "name", "kcal_per_100g", "protein_per_100g",
+        "carbs_per_100g", "fat_per_100g",
+        "default_unit", "default_quantity"
+    ]
+    errors = {}
+    for field in required:
+        if field not in data or data[field] in ("", None):
+            errors[field] = "Obligatorio"
     if errors:
         return jsonify(error="ValidationError", fields=errors), 422
 
@@ -238,39 +244,64 @@ def list_meals():
 def create_meal():
     """
     Crea una nueva comida.
-    JSON body: food_id, quantity, meal_type, opcional: date, time
+    JSON body: food_id, quantity, meal_type, opcional: date, time, unit
     """
     data = request.get_json() or {}
+    errors = {}
+
+    # Validar food_id con Session.get()
     try:
-        food = Food.query.get(int(data["food_id"]))
+        food = db.session.get(Food, int(data.get("food_id", 0)))
         if not food:
-            return jsonify(error="FoodNotFound", message="Alimento no encontrado"), 404
+            errors["food_id"] = "Alimento no encontrado"
+    except (ValueError, TypeError):
+        errors["food_id"] = "ID inválido"
+
+    # Validar quantity
+    try:
         qty = float(data.get("quantity", 0))
         if qty <= 0:
-            return jsonify(error="ValidationError", fields={"quantity":"Debe ser positivo"}), 422
-
-        m = Meal(
-            user_id=current_user.id,
-            food_id=food.id,
-            quantity=qty,
-            meal_type=data.get("meal_type", "comida"),
-            date=(date.fromisoformat(data["date"]) if data.get("date") else date.today()),
-            time=(datetime.fromisoformat(data["time"]).time() if data.get("time") else datetime.utcnow().time())
-        )
-        m.food = food
-        macros = _compute_macros(food, qty, data.get("unit", food.default_unit))
-        m.calories = int(macros["kcal"])
-        m.protein  = int(macros["protein"])
-        m.carbs    = int(macros["carbs"])
-        m.fats     = int(macros["fat"])
-
-        db.session.add(m)
-        db.session.commit()
-    except KeyError:
-        return jsonify(error="ValidationError", message="Datos faltantes"), 422
+            errors["quantity"] = "Debe ser positivo"
     except (ValueError, TypeError):
-        return jsonify(error="ValidationError", message="Datos inválidos"), 422
+        errors["quantity"] = "Cantidad inválida"
 
+    # Validar meal_type
+    mtype = data.get("meal_type", "")
+    if mtype not in ("desayuno", "comida", "merienda", "cena"):
+        errors["meal_type"] = "Tipo inválido"
+
+    if errors:
+        return jsonify(error="ValidationError", fields=errors), 422
+
+    # Construir fecha y hora
+    try:
+        dt_date = date.fromisoformat(data["date"]) if data.get("date") else date.today()
+    except ValueError:
+        return jsonify(error="InvalidDate", message="Formato YYYY-MM-DD"), 422
+
+    try:
+        dt_time = datetime.fromisoformat(data["time"]).time() if data.get("time") else datetime.utcnow().time()
+    except ValueError:
+        return jsonify(error="InvalidTime", message="Formato HH:MM:SS"), 422
+
+    # Crear y cachear
+    m = Meal(
+        user_id=current_user.id,
+        food_id=food.id,
+        quantity=qty,
+        meal_type=mtype,
+        date=dt_date,
+        time=dt_time
+    )
+    m.food = food
+    macros = _compute_macros(food, qty, data.get("unit", food.default_unit))
+    m.calories = int(macros["kcal"])
+    m.protein  = int(macros["protein"])
+    m.carbs    = int(macros["carbs"])
+    m.fats     = int(macros["fat"])
+
+    db.session.add(m)
+    db.session.commit()
     return jsonify(meal=_meal_to_dict(m)), 201
 
 
@@ -279,13 +310,29 @@ def create_meal():
 def update_meal(meal_id):
     """
     Actualiza una comida existente.
-    JSON body: cualquier campo de Meal.update_from_dict
+    JSON body: cualquier campo válido para Meal.update_from_dict.
     """
     m = Meal.query.filter_by(id=meal_id, user_id=current_user.id).first()
     if not m:
         return jsonify(error="MealNotFound"), 404
 
     data = request.get_json() or {}
+    errors = {}
+
+    if "quantity" in data:
+        try:
+            qty = float(data["quantity"])
+            if qty <= 0:
+                errors["quantity"] = "Debe ser positivo"
+        except (ValueError, TypeError):
+            errors["quantity"] = "Cantidad inválida"
+
+    if "meal_type" in data and data["meal_type"] not in ("desayuno", "comida", "merienda", "cena"):
+        errors["meal_type"] = "Tipo inválido"
+
+    if errors:
+        return jsonify(error="ValidationError", fields=errors), 422
+
     try:
         m.update_from_dict(data)
         db.session.commit()
@@ -304,6 +351,7 @@ def delete_meal(meal_id):
     m = Meal.query.filter_by(id=meal_id, user_id=current_user.id).first()
     if not m:
         return jsonify(error="MealNotFound"), 404
+
     db.session.delete(m)
     db.session.commit()
     return jsonify(message="Comida eliminada"), 200

@@ -10,10 +10,18 @@
     <h5>Comidas añadidas</h5>
     <div id="today-meals-list">
       {% for m in meals %}
-        <div class="d-flex justify-content-between py-1 border-bottom">
-          <div>{{ m.time }} — {{ m.food.name }} ({{ m.quantity }})</div>
-          <div>{{ m.calories }} kcal</div>
+      <div class="d-flex justify-content-between align-items-center py-1 border-bottom" data-meal-id="{{ m.id }}">
+        <div>
+          <span class="meal-time">{{ m.time }}</span> —
+          <span class="meal-name">{{ m.food.name }}</span>
+          (<span class="meal-quantity">{{ m.quantity }}</span>)
         </div>
+        <div>
+          <span class="meal-calories">{{ m.calories }}</span> kcal
+          <button class="btn btn-sm btn-link edit-meal">✏️</button>
+          <button class="btn btn-sm btn-link text-danger delete-meal">🗑️</button>
+        </div>
+      </div>
       {% endfor %}
     </div>
   </div>
@@ -23,36 +31,39 @@
     <h5>Totales</h5>
     <ul class="list-unstyled">
       <li>Kcal: <span id="total-kcal">{{ total_kcal }}</span></li>
-      <li>Proteínas: <span id="total-protein">{{ total_protein }}</span> g</li>
+      <li>Proteínas: <span id="total-protein">{{ total_proteinas }}</span> g</li>
       <li>Carbs: <span id="total-carbs">{{ total_carbs }}</span> g</li>
-      <li>Grasas: <span id="total-fats">{{ total_fats }}</span> g</li>
+      <li>Grasas: <span id="total-fats">{{ total_grasas }}</span> g</li>
     </ul>
   </div>
 
   <!-- Formulario AJAX de añadir comida -->
-  <form id="add-meal-form">
+  <form id="add-meal-form" class="mb-5">
     <div class="mb-3 position-relative">
       <label for="food-search" class="form-label">Buscar alimento</label>
-      <input type="text"
-             id="food-search"
-             class="form-control"
-             placeholder="Escribe al menos 2 letras"
-             autocomplete="off">
-      <ul id="suggestions"
-          class="list-group position-absolute w-100"
-          style="z-index:1000; max-height:200px; overflow-y:auto;"></ul>
+      <input
+        type="text"
+        id="food-search"
+        class="form-control"
+        placeholder="Escribe al menos 2 letras"
+        autocomplete="off">
+      <ul
+        id="suggestions"
+        class="list-group position-absolute w-100"
+        style="z-index:1000; max-height:200px; overflow-y:auto;"></ul>
       <input type="hidden" name="food_id" id="food-id">
     </div>
 
     <div class="mb-3">
       <label for="quantity" class="form-label">Cantidad</label>
-      <input type="number"
-             name="quantity"
-             id="quantity"
-             class="form-control"
-             step="any"
-             min="0.01"
-             required>
+      <input
+        type="number"
+        name="quantity"
+        id="quantity"
+        class="form-control"
+        step="any"
+        min="0.01"
+        required>
     </div>
 
     <div class="mb-3">
@@ -67,10 +78,11 @@
 
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Añadir al diario</button>
-      <button type="button"
-              class="btn btn-secondary"
-              data-bs-toggle="modal"
-              data-bs-target="#foodModal">
+      <button
+        type="button"
+        class="btn btn-secondary"
+        data-bs-toggle="modal"
+        data-bs-target="#foodModal">
         + Crear alimento
       </button>
       <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Volver</a>
@@ -148,17 +160,13 @@ document.addEventListener('DOMContentLoaded', () => {
       foodIdInput.value = '';
       return;
     }
-
     debounceTimer = setTimeout(() => {
       fetch(`/api/foods?search=${encodeURIComponent(q)}`)
         .then(r => r.json())
         .then(data => {
           suggestionsBox.innerHTML = '';
           if (!data.foods.length) {
-            const li = document.createElement('li');
-            li.className = 'list-group-item text-muted';
-            li.textContent = 'No se encontraron alimentos.';
-            suggestionsBox.append(li);
+            suggestionsBox.innerHTML = '<li class="list-group-item text-muted">No se encontraron alimentos.</li>';
             return;
           }
           data.foods.forEach(item => {
@@ -166,12 +174,12 @@ document.addEventListener('DOMContentLoaded', () => {
             li.className = 'list-group-item list-group-item-action';
             li.innerHTML = `<strong>${item.name}</strong> <small class="text-muted">(${item.macros_per_100g.kcal} kcal/100g)</small>`;
             li.style.cursor = 'pointer';
-            li.onclick = () => {
+            li.addEventListener('click', () => {
               searchInput.value = item.name;
               foodIdInput.value = item.id;
               suggestionsBox.innerHTML = '';
-            };
-            suggestionsBox.append(li);
+            });
+            suggestionsBox.appendChild(li);
           });
         });
     }, 300);
@@ -199,32 +207,29 @@ document.addEventListener('DOMContentLoaded', () => {
       carbs_per_unit: parseFloat(document.getElementById('food-carbs1').value) || null,
       fat_per_unit: parseFloat(document.getElementById('food-fat1').value) || null
     };
-
     fetch('/api/foods', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
     .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
-    .then(food => {
-      searchInput.value = food.name;
-      foodIdInput.value = food.id;
-      const modalEl = document.getElementById('foodModal');
-      bootstrap.Modal.getInstance(modalEl).hide();
+    .then(data => {
+      searchInput.value = data.food.name;
+      foodIdInput.value = data.food.id;
+      bootstrap.Modal.getInstance(document.getElementById('foodModal')).hide();
     })
     .catch(err => alert(err.error || 'Error al crear el alimento'));
   });
 
-  // AJAX para añadir comida
+  // Añadir comida (POST AJAX)
   document.getElementById('add-meal-form').addEventListener('submit', e => {
     e.preventDefault();
     const payload = {
-      food_id: document.getElementById('food-id').value,
+      food_id: parseInt(foodIdInput.value),
       quantity: parseFloat(document.getElementById('quantity').value),
       meal_type: document.getElementById('meal_type').value
     };
-
-    fetch('/meals/new', {
+    fetch('/api/meals', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -232,34 +237,97 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       body: JSON.stringify(payload)
     })
-    .then(r => r.ok
-      ? r.json()
-      : r.json().then(err => Promise.reject(err)))
-    .then(m => {
-      // Añadir fila
+    .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
+    .then(({ meal }) => {
+      // Añadir fila nueva
       const list = document.getElementById('today-meals-list');
       const row = document.createElement('div');
-      row.className = 'd-flex justify-content-between py-1 border-bottom';
-      row.innerHTML = `<div>${m.time} — ${m.food.name} (${m.quantity})</div><div>${m.calories} kcal</div>`;
-      list.append(row);
+      row.className = 'd-flex justify-content-between align-items-center py-1 border-bottom';
+      row.setAttribute('data-meal-id', meal.id);
+      row.innerHTML = `
+        <div>
+          <span class="meal-time">${meal.time}</span> —
+          <span class="meal-name">${meal.food.name}</span>
+          (<span class="meal-quantity">${meal.quantity}</span>)
+        </div>
+        <div>
+          <span class="meal-calories">${meal.calories}</span> kcal
+          <button class="btn btn-sm btn-link edit-meal">✏️</button>
+          <button class="btn btn-sm btn-link text-danger delete-meal">🗑️</button>
+        </div>`;
+      list.appendChild(row);
 
       // Actualizar totales
       document.getElementById('total-kcal').textContent =
-        parseInt(document.getElementById('total-kcal').textContent) + m.calories;
+        parseInt(document.getElementById('total-kcal').textContent) + meal.calories;
       document.getElementById('total-protein').textContent =
-        parseInt(document.getElementById('total-protein').textContent) + m.protein;
+        parseInt(document.getElementById('total-protein').textContent) + meal.protein;
       document.getElementById('total-carbs').textContent =
-        parseInt(document.getElementById('total-carbs').textContent) + m.carbs;
+        parseInt(document.getElementById('total-carbs').textContent) + meal.carbs;
       document.getElementById('total-fats').textContent =
-        parseInt(document.getElementById('total-fats').textContent) + m.fats;
+        parseInt(document.getElementById('total-fats').textContent) + meal.fats;
 
       // Reset form
-      document.getElementById('food-search').value = '';
-      document.getElementById('food-id').value = '';
+      searchInput.value = '';
+      foodIdInput.value = '';
       document.getElementById('quantity').value = '';
-      document.getElementById('suggestions').innerHTML = '';
+      suggestionsBox.innerHTML = '';
     })
     .catch(err => alert(err.error || 'Error al añadir comida'));
+  });
+
+  // Borrar comida (DELETE AJAX)
+  document.getElementById('today-meals-list').addEventListener('click', e => {
+    if (!e.target.matches('.delete-meal')) return;
+    const row = e.target.closest('[data-meal-id]');
+    const id  = row.dataset.mealId;
+    fetch(`/api/meals/${id}`, { method: 'DELETE' })
+      .then(r => {
+        if (r.ok) {
+          const kcal = parseInt(row.querySelector('.meal-calories').textContent);
+          document.getElementById('total-kcal').textContent =
+            parseInt(document.getElementById('total-kcal').textContent) - kcal;
+          row.remove();
+        } else {
+          return r.json().then(err => Promise.reject(err));
+        }
+      })
+      .catch(err => alert(err.error || 'Error al borrar comida'));
+  });
+
+  // Editar comida (PUT AJAX)
+  document.getElementById('today-meals-list').addEventListener('click', e => {
+    if (!e.target.matches('.edit-meal')) return;
+    const row        = e.target.closest('[data-meal-id]');
+    const id         = row.dataset.mealId;
+    const qtySpan    = row.querySelector('.meal-quantity');
+    const calSpan    = row.querySelector('.meal-calories');
+    const oldQty     = parseFloat(qtySpan.textContent);
+    const oldCal     = parseInt(calSpan.textContent);
+    const newQtyStr  = prompt('Nueva cantidad:', oldQty);
+    if (newQtyStr === null) return;
+    const newQty = parseFloat(newQtyStr);
+    if (isNaN(newQty) || newQty <= 0) {
+      return alert('Cantidad inválida');
+    }
+
+    fetch(`/api/meals/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({ quantity: newQty })
+    })
+    .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+    .then(({ meal }) => {
+      qtySpan.textContent = meal.quantity;
+      calSpan.textContent = meal.calories;
+      const diff = meal.calories - oldCal;
+      document.getElementById('total-kcal').textContent =
+        parseInt(document.getElementById('total-kcal').textContent) + diff;
+    })
+    .catch(err => alert(err.error || 'Error al editar comida'));
   });
 });
 </script>
