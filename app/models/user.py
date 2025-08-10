@@ -2,9 +2,49 @@
 
 from datetime import date, datetime
 from sqlalchemy import CheckConstraint
+from sqlalchemy.dialects.sqlite import JSON as SQLITE_JSON
+from sqlalchemy.types import JSON as SA_JSON
 from app import db, login_manager
 from flask_login import UserMixin
 
+
+# --------- Helpers JSON (compatibles con SQLite y otros motores) -------------
+def _json_type():
+    try:
+        # Usa JSON nativo en SQLite si está disponible
+        return SA_JSON().with_variant(SQLITE_JSON(), 'sqlite')
+    except Exception:
+        return SA_JSON
+
+
+def _default_daily_goals():
+    # Objetivo diario por defecto (editable por el usuario)
+    return {"kcal": 2200, "protein": 130, "carbs": 250, "fat": 70}
+
+
+def _default_meal_plan():
+    # Comidas por defecto + distribución en % (suma 100) + tolerancias
+    return {
+        "meals": ["desayuno", "almuerzo", "comida", "merienda", "cena"],
+        "distribution": {"desayuno": 20, "almuerzo": 10, "comida": 35, "merienda": 10, "cena": 25},
+        "tolerance": {
+            "per_meal": {"lower": -0.08, "upper": 0.08},   # ±8% por comida
+            "daily":    {"lower": -0.05, "upper": 0.05}    # ±5% diario
+        }
+    }
+
+
+def _default_training_mods():
+    # Ventanas basadas en evidencia (parametrizable por usuario)
+    # pre: 1–3 h antes (usamos 3h ventana), +CHO, -grasa
+    # post: 0–2 h después, +PRO y +CHO moderado, -grasa
+    return {
+        "pre":  {"window_h": 3, "carbs_pct_add": 0.15, "protein_pct_add": 0.00, "fat_pct_add": -0.10},
+        "post": {"window_h": 2, "carbs_pct_add": 0.05, "protein_pct_add": 0.10, "fat_pct_add": -0.05},
+    }
+
+
+# --------------------------------- MODELOS -----------------------------------
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
 
@@ -22,6 +62,8 @@ class Profile(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+
+    # Datos básicos
     sexo = db.Column(db.String(10), nullable=False)
     altura = db.Column(db.Float, nullable=False)
     peso = db.Column(db.Float, nullable=False)
@@ -30,7 +72,26 @@ class Profile(db.Model):
     formula_bmr = db.Column(db.String(20), default='mifflin', nullable=False)
     porcentaje_grasa = db.Column(db.Float, nullable=True)
 
+    # NUEVO: configuración nutricional y de planificación
+    daily_goals   = db.Column(_json_type(), default=_default_daily_goals)  # {'kcal','protein','carbs','fat'}
+    meal_plan     = db.Column(_json_type(), default=_default_meal_plan)    # comidas, distribución %, tolerancias
+    training_mods = db.Column(_json_type(), default=_default_training_mods)  # ajustes pre/post entreno
+
     user = db.relationship('User', back_populates='profile')
+
+    # Helpers útiles (seguro para code-behind y endpoints)
+    def meals_order(self):
+        mp = self.meal_plan or {}
+        return list((mp.get("meals") or [])) or ["desayuno", "almuerzo", "comida", "merienda", "cena"]
+
+    def distribution(self):
+        mp = self.meal_plan or {}
+        return dict(mp.get("distribution") or {})
+
+    def tolerance(self):
+        mp = self.meal_plan or {}
+        return dict(mp.get("tolerance") or {"per_meal": {"lower": -0.08, "upper": 0.08},
+                                            "daily":    {"lower": -0.05, "upper": 0.05}})
 
 
 class Meal(db.Model):
@@ -95,7 +156,7 @@ class Meal(db.Model):
         de Food: fat_per_unit (no fats_per_unit), etc.
         """
         food = self.food
-        qty = self.quantity
+        qty = float(self.quantity or 0)
 
         # Decide si usar valores por unidad o por 100g
         if food.kcal_per_unit is not None:
@@ -111,10 +172,10 @@ class Meal(db.Model):
             carbs_base = food.carbs_per_100g or 0
             fats_base  = food.fat_per_100g or 0
 
-        self.calories = int(kcal_base * factor)
-        self.protein  = int(prot_base * factor)
-        self.carbs    = int(carbs_base * factor)
-        self.fats     = int(fats_base * factor)
+        self.calories = int(round(kcal_base * factor))
+        self.protein  = int(round(prot_base * factor))
+        self.carbs    = int(round(carbs_base * factor))
+        self.fats     = int(round(fats_base * factor))
 
 
 @login_manager.user_loader

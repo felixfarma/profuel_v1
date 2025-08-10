@@ -1,6 +1,6 @@
 # app/routes/api.py
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from app import db
@@ -12,12 +12,11 @@ from app.utils.calculos import calcular_edad, calcular_bmr, calcular_tdee
 api = Blueprint("api", __name__, url_prefix="/api")
 
 
-# ---------- Helpers ----------
-
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
 def _food_to_dict(f: Food):
-    """
-    Serializa un Food para JSON.
-    """
+    """Serializa un Food para JSON."""
     m100 = {
         "kcal": f.kcal_per_100g or 0,
         "protein": f.protein_per_100g or 0,
@@ -43,9 +42,7 @@ def _food_to_dict(f: Food):
 
 
 def _meal_to_dict(m: Meal):
-    """
-    Serializa un Meal para JSON.
-    """
+    """Serializa un Meal para JSON."""
     return {
         "id": m.id,
         "food": _food_to_dict(m.food),
@@ -61,10 +58,7 @@ def _meal_to_dict(m: Meal):
 
 
 def _compute_macros(food: Food, qty: float, unit: str):
-    """
-    Calcula macros en función de unidad o por 100g.
-    """
-    # Si la unidad coincide y hay datos por unidad, usamos ese base
+    """Calcula macros según unidad (por unidad si existe; si no, por 100g)."""
     if unit == food.default_unit and food.kcal_per_unit is not None:
         factor = qty
         kcal_base    = food.kcal_per_unit
@@ -77,7 +71,6 @@ def _compute_macros(food: Food, qty: float, unit: str):
         protein_base = food.protein_per_100g or 0
         carbs_base   = food.carbs_per_100g or 0
         fat_base     = food.fat_per_100g or 0
-
     return {
         "kcal":    kcal_base    * factor,
         "protein": protein_base * factor,
@@ -86,10 +79,86 @@ def _compute_macros(food: Food, qty: float, unit: str):
     }
 
 
-# =====================
-# PROFILE ENDPOINTS
-# =====================
+def _today_iso():
+    return date.today().isoformat()
 
+
+def _get_profile(user_id):
+    return Profile.query.filter_by(user_id=user_id).first()
+
+
+def _ensure_goals(profile: Profile) -> Profile:
+    """Garantiza que el perfil tiene estructuras de objetivos/config inicializadas."""
+    if not profile:
+        return None
+    changed = False
+    if not profile.daily_goals:
+        profile.daily_goals = {"kcal": 2200, "protein": 130, "carbs": 250, "fat": 70}
+        changed = True
+    if not profile.meal_plan or "meals" not in profile.meal_plan:
+        profile.meal_plan = {
+            "meals": ["desayuno", "almuerzo", "comida", "merienda", "cena"],
+            "distribution": {"desayuno": 20, "almuerzo": 10, "comida": 35, "merienda": 10, "cena": 25},
+            "tolerance": {"per_meal": {"lower": -0.08, "upper": 0.08},
+                          "daily":    {"lower": -0.05, "upper": 0.05}}
+        }
+        changed = True
+    if not profile.training_mods:
+        profile.training_mods = {
+            "pre":  {"window_h": 3, "carbs_pct_add": 0.15, "protein_pct_add": 0.00, "fat_pct_add": -0.10},
+            "post": {"window_h": 2, "carbs_pct_add": 0.05, "protein_pct_add": 0.10, "fat_pct_add": -0.05},
+        }
+        changed = True
+    if changed:
+        db.session.commit()
+    return profile
+
+
+def _scale(value, pct):
+    """Aplica porcentaje sobre valor (pct en %)."""
+    return round((value or 0) * (pct / 100.0))
+
+
+def _distribute_macros(daily_goals: dict, pct: float) -> dict:
+    """Reparte kcal y macros por comida según porcentaje."""
+    g = daily_goals or {}
+    return {
+        "kcal":   _scale(g.get("kcal", 0), pct),
+        "protein": round((g.get("protein", 0) or 0) * (pct/100.0)),
+        "carbs":   round((g.get("carbs", 0)   or 0) * (pct/100.0)),
+        "fat":     round((g.get("fat", 0)     or 0) * (pct/100.0)),
+    }
+
+
+def _apply_training_mods(base_meal_goals: dict, meal_dt: datetime, trainings: list, mods: dict) -> dict:
+    """
+    Aplica ajustes pre/post si la hora de la comida cae en ventanas relativas a sesiones.
+    trainings: lista de dicts con al menos {"start": datetime}.
+    """
+    if not trainings:
+        return base_meal_goals
+    out = dict(base_meal_goals)
+    pre_w = (mods.get("pre", {}) or {}).get("window_h", 0)
+    post_w = (mods.get("post", {}) or {}).get("window_h", 0)
+
+    for ses in trainings:
+        start = ses["start"]
+        # Ventana pre: (start - pre_w, start)
+        if pre_w and (start - timedelta(hours=pre_w) <= meal_dt < start):
+            out["carbs"]   = round(out["carbs"]   * (1 + (mods["pre"].get("carbs_pct_add", 0) or 0)))
+            out["protein"] = round(out["protein"] * (1 + (mods["pre"].get("protein_pct_add", 0) or 0)))
+            out["fat"]     = round(out["fat"]     * (1 + (mods["pre"].get("fat_pct_add", 0) or 0)))
+        # Ventana post: [start, start + post_w]
+        if post_w and (start <= meal_dt <= start + timedelta(hours=post_w)):
+            out["carbs"]   = round(out["carbs"]   * (1 + (mods["post"].get("carbs_pct_add", 0) or 0)))
+            out["protein"] = round(out["protein"] * (1 + (mods["post"].get("protein_pct_add", 0) or 0)))
+            out["fat"]     = round(out["fat"]     * (1 + (mods["post"].get("fat_pct_add", 0) or 0)))
+    return out
+
+
+# -----------------------------------------------------------------------------
+# PROFILE
+# -----------------------------------------------------------------------------
 @api.route("/profile", methods=["GET"])
 @login_required
 def get_profile():
@@ -131,28 +200,80 @@ def update_profile():
     if not profile:
         return jsonify(error="ProfileNotFound"), 404
 
-    for field in (
-        "sexo", "altura", "peso",
-        "fecha_nacimiento", "actividad",
-        "formula_bmr", "porcentaje_grasa"
-    ):
+    for field in ("sexo", "altura", "peso", "fecha_nacimiento", "actividad", "formula_bmr", "porcentaje_grasa"):
         if field in data:
             setattr(profile, field, data[field])
     db.session.commit()
     return jsonify(message="Perfil actualizado"), 200
 
 
-# =====================
-# FOOD ENDPOINTS
-# =====================
+# -----------------------------------------------------------------------------
+# GOALS (nuevo)
+# -----------------------------------------------------------------------------
+@api.route("/goals/daily", methods=["GET"])
+@login_required
+def get_daily_goals():
+    """Objetivos diarios base (kcal, proteína, carbos, grasas) + tolerancias del usuario actual."""
+    prof = _ensure_goals(_get_profile(current_user.id))
+    if not prof:
+        return jsonify(error="ProfileNotFound"), 404
+    return jsonify({
+        "date": _today_iso(),
+        "goals": prof.daily_goals,
+        "tolerance": prof.meal_plan.get("tolerance", {})
+    })
 
+
+@api.route("/goals/meals", methods=["GET"])
+@login_required
+def get_meal_goals():
+    """
+    Objetivos por comida ya distribuidos (con tolerancias, listos para mods pre/post).
+    Query: ?date=YYYY-MM-DD (opcional, hoy por defecto)
+    Nota: los mods pre/post se aplicarán cuando haya entrenos conectados; dejamos placeholder.
+    """
+    date_str = request.args.get("date") or _today_iso()
+    prof = _ensure_goals(_get_profile(current_user.id))
+    if not prof:
+        return jsonify(error="ProfileNotFound"), 404
+
+    meals_order = prof.meals_order()
+    dist = prof.distribution()
+    daily = prof.daily_goals or {}
+    tolerance = prof.tolerance()
+    mods = prof.training_mods or {}
+
+    trainings = []  # Integración futura: [{"start": datetime(...)}]
+    default_hours = {"desayuno": 8, "almuerzo": 11, "comida": 14, "merienda": 17, "cena": 21}
+
+    by_meal = {}
+    for name in meals_order:
+        pct = float(dist.get(name, 0))
+        base = _distribute_macros(daily, pct)
+        # Heurística de hora para aplicar mods (hasta tener hora real en UI)
+        try:
+            hh = int(default_hours.get(name, 12))
+            meal_dt = datetime.fromisoformat(f"{date_str}T{hh:02d}:00:00")
+        except Exception:
+            meal_dt = datetime.now()
+        final = _apply_training_mods(base, meal_dt, trainings, mods)
+        by_meal[name] = final
+
+    return jsonify({
+        "date": date_str,
+        "tolerance": tolerance,
+        "by_meal": by_meal,
+        "meals_order": meals_order
+    })
+
+
+# -----------------------------------------------------------------------------
+# FOODS
+# -----------------------------------------------------------------------------
 @api.route("/foods", methods=["GET"])
 @login_required
 def get_foods():
-    """
-    Búsqueda híbrida de alimentos.
-    ?search=term
-    """
+    """Búsqueda híbrida de alimentos. ?search=term"""
     q = request.args.get("search", "").strip()
     local = []
     if q:
@@ -164,7 +285,6 @@ def get_foods():
     suggestions = []
     if q:
         suggestions = search_off(q, limit=10, timeout=5)
-
     return jsonify(foods=[], suggestions=suggestions), 200
 
 
@@ -173,9 +293,9 @@ def get_foods():
 def create_food():
     """
     Crea un nuevo alimento.
-    JSON body: name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g,
-               default_unit, default_quantity,
-               opcional: kcal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit
+    JSON: name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g,
+          default_unit, default_quantity,
+          opcional: kcal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit
     """
     data = request.get_json() or {}
     required = [
@@ -216,24 +336,23 @@ def create_food():
     return jsonify(food=_food_to_dict(f)), 201
 
 
-# =====================
-# MEAL ENDPOINTS
-# =====================
-
+# -----------------------------------------------------------------------------
+# MEALS
+# -----------------------------------------------------------------------------
 @api.route("/meals", methods=["GET"])
 @login_required
 def list_meals():
-    """
-    Lista comidas para una fecha dada.
-    ?date=YYYY-MM-DD
-    """
+    """Lista comidas para una fecha dada. ?date=YYYY-MM-DD"""
     date_str = request.args.get("date")
     try:
         target = date.fromisoformat(date_str) if date_str else date.today()
     except ValueError:
         return jsonify(error="InvalidDate", message="Formato YYYY-MM-DD"), 422
 
-    meals = Meal.query.filter_by(user_id=current_user.id, date=target).order_by(Meal.time).all()
+    meals = (Meal.query
+             .filter_by(user_id=current_user.id, date=target)
+             .order_by(Meal.time.asc())
+             .all())
     return jsonify(meals=[_meal_to_dict(m) for m in meals]), 200
 
 
@@ -242,12 +361,12 @@ def list_meals():
 def create_meal():
     """
     Crea una nueva comida.
-    JSON body: food_id, quantity, meal_type, opcional: date, time, unit
+    JSON: food_id, quantity, meal_type, opcional: date, time, unit
     """
     data = request.get_json() or {}
     errors = {}
 
-    # validar food_id con Session.get()
+    # validar food_id
     try:
         food = db.session.get(Food, int(data.get("food_id", 0)))
         if not food:
@@ -263,15 +382,17 @@ def create_meal():
     except (ValueError, TypeError):
         errors["quantity"] = "Cantidad inválida"
 
-    # validar meal_type
-    mtype = data.get("meal_type", "")
-    if mtype not in ("desayuno", "comida", "merienda", "cena"):
-        errors["meal_type"] = "Tipo inválido"
+    # validar meal_type dinámico según perfil
+    mtype = (data.get("meal_type") or "").strip().lower()
+    prof = _ensure_goals(_get_profile(current_user.id))
+    allowed = set(prof.meals_order() if prof else ["desayuno", "almuerzo", "comida", "merienda", "cena"])
+    if not mtype or mtype not in allowed:
+        errors["meal_type"] = f"Tipo inválido. Permitidos: {', '.join(allowed)}"
 
     if errors:
         return jsonify(error="ValidationError", fields=errors), 422
 
-    # construir fecha y hora
+    # fecha y hora
     try:
         dt_date = date.fromisoformat(data["date"]) if data.get("date") else date.today()
     except ValueError:
@@ -282,7 +403,7 @@ def create_meal():
     except ValueError:
         return jsonify(error="InvalidTime", message="Formato HH:MM:SS"), 422
 
-    # crear y cachear
+    # crear + cachés
     m = Meal(
         user_id=current_user.id,
         food_id=food.id,
@@ -293,10 +414,10 @@ def create_meal():
     )
     m.food = food
     macros = _compute_macros(food, qty, data.get("unit", food.default_unit))
-    m.calories = int(macros["kcal"])
-    m.protein  = int(macros["protein"])
-    m.carbs    = int(macros["carbs"])
-    m.fats     = int(macros["fat"])
+    m.calories = int(round(macros["kcal"]))
+    m.protein  = int(round(macros["protein"]))
+    m.carbs    = int(round(macros["carbs"]))
+    m.fats     = int(round(macros["fat"]))
 
     db.session.add(m)
     db.session.commit()
@@ -307,8 +428,8 @@ def create_meal():
 @login_required
 def update_meal(meal_id):
     """
-    Actualiza una comida existente.
-    JSON body: campos válidos para Meal.update_from_dict.
+    Actualiza una comida.
+    JSON: cualquiera de {date, time, quantity, food_id, meal_type}
     """
     m = Meal.query.filter_by(id=meal_id, user_id=current_user.id).first()
     if not m:
@@ -324,8 +445,12 @@ def update_meal(meal_id):
                 errors["quantity"] = "Debe ser positivo"
         except (ValueError, TypeError):
             errors["quantity"] = "Cantidad inválida"
-    if "meal_type" in data and data["meal_type"] not in ("desayuno", "comida", "merienda", "cena"):
-        errors["meal_type"] = "Tipo inválido"
+
+    if "meal_type" in data:
+        prof = _ensure_goals(_get_profile(current_user.id))
+        allowed = set(prof.meals_order() if prof else ["desayuno", "almuerzo", "comida", "merienda", "cena"])
+        if (data["meal_type"] or "").lower() not in allowed:
+            errors["meal_type"] = f"Tipo inválido. Permitidos: {', '.join(allowed)}"
 
     if errors:
         return jsonify(error="ValidationError", fields=errors), 422
@@ -342,48 +467,59 @@ def update_meal(meal_id):
 @api.route("/meals/<int:meal_id>", methods=["DELETE"])
 @login_required
 def delete_meal(meal_id):
-    """
-    Elimina una comida.
-    """
+    """Elimina una comida."""
     m = Meal.query.filter_by(id=meal_id, user_id=current_user.id).first()
     if not m:
         return jsonify(error="MealNotFound"), 404
-
     db.session.delete(m)
     db.session.commit()
     return jsonify(message="Comida eliminada"), 200
 
 
-# ==============================
-# NEW: STATS ENDPOINT
-# ==============================
-
+# -----------------------------------------------------------------------------
+# STATS (mejorado)
+# -----------------------------------------------------------------------------
 @api.route("/meals/stats", methods=["GET"])
 @login_required
 def meals_stats():
     """
-    Macros agrupados por tipo de comida y totales del día.
-    ?date=YYYY-MM-DD
+    Suma de consumos del día.
+    Query:
+      - date=YYYY-MM-DD (opcional, hoy por defecto)
+      - group_by=meal_type (si se pasa, devuelve por comida + total)
     """
-    date_str = request.args.get("date")
+    date_str = request.args.get("date") or _today_iso()
+    group_by = request.args.get("group_by")
+
     try:
-        target = date.fromisoformat(date_str) if date_str else date.today()
+        target_date = date.fromisoformat(date_str)
     except ValueError:
         return jsonify(error="InvalidDate", message="Formato YYYY-MM-DD"), 422
 
-    types = ["desayuno", "comida", "merienda", "cena"]
-    stats = {t: {"kcal": 0, "protein": 0, "carbs": 0, "fat": 0} for t in types}
-    total = {"kcal": 0, "protein": 0, "carbs": 0, "fat": 0}
+    q = Meal.query.filter_by(user_id=current_user.id, date=target_date)
 
-    for m in Meal.query.filter_by(user_id=current_user.id, date=target).all():
-        if m.meal_type in stats:
-            stats[m.meal_type]["kcal"]    += m.calories
-            stats[m.meal_type]["protein"] += m.protein
-            stats[m.meal_type]["carbs"]   += m.carbs
-            stats[m.meal_type]["fat"]     += m.fats
-        total["kcal"]    += m.calories
-        total["protein"] += m.protein
-        total["carbs"]   += m.carbs
-        total["fat"]     += m.fats
+    def agg(rows):
+        tk = sum(getattr(m, "calories", 0) for m in rows)
+        tp = sum(getattr(m, "protein", 0)  for m in rows)
+        tc = sum(getattr(m, "carbs", 0)    for m in rows)
+        tf = sum(getattr(m, "fats", 0)     for m in rows)
+        return {"kcal": tk, "protein": tp, "carbs": tc, "fat": tf}
 
-    return jsonify(stats=stats, total=total), 200
+    if group_by == "meal_type":
+        prof = _ensure_goals(_get_profile(current_user.id))
+        base_keys = prof.meals_order() if prof else ["desayuno", "almuerzo", "comida", "merienda", "cena"]
+
+        buckets = {k: [] for k in base_keys}
+        # incluye también tipos no previstos que el usuario haya usado
+        for m in q:
+            key = (m.meal_type or "otros").lower()
+            buckets.setdefault(key, [])
+            buckets[key].append(m)
+
+        by_meal = {k: agg(v) for k, v in buckets.items()}
+        total = agg(q)
+        return jsonify({"date": date_str, "by_meal": by_meal, "total": total}), 200
+
+    # Solo total
+    total = agg(q)
+    return jsonify({"date": date_str, "total": total}), 200
