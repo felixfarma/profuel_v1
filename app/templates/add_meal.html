@@ -8,22 +8,36 @@
   <!-- Listado de comidas de hoy -->
   <div class="mb-4">
     <h5>Comidas añadidas</h5>
-    <div id="today-meals-list">
+    <div id="today-meals-list" aria-live="polite">
       {% for m in meals %}
-        <div class="d-flex justify-content-between align-items-center py-1 border-bottom meal-row" data-meal-id="{{ m.id }}">
+        <div class="d-flex justify-content-between align-items-center py-1 border-bottom meal-row"
+             data-meal-id="{{ m.id }}"
+             {% if m.protein is defined %}data-protein="{{ m.protein }}"{% endif %}
+             {% if m.carbs is defined %}data-carbs="{{ m.carbs }}"{% endif %}
+             {% if m.fats is defined %}data-fats="{{ m.fats }}"{% endif %}
+             {% if m.calories is defined %}data-kcal="{{ m.calories }}"{% endif %}>
           <div>
             <strong class="meal-time">{{ m.time }}</strong> —
             {{ m.food.name }}
             (<span class="meal-quantity">{{ m.quantity }}</span> {{ m.food.default_unit }})
+            {% if m.protein is defined and m.carbs is defined and m.fats is defined %}
+              <small class="text-muted d-inline-block ms-2">
+                <span class="meal-protein">{{ m.protein }}</span>P ·
+                <span class="meal-carbs">{{ m.carbs }}</span>C ·
+                <span class="meal-fats">{{ m.fats }}</span>G
+              </small>
+            {% endif %}
           </div>
           <div class="d-flex align-items-center">
             <span class="me-3">
               <span class="meal-calories">{{ m.calories }}</span> kcal
             </span>
-            <button class="btn btn-sm btn-outline-secondary me-1 edit-meal">✏️</button>
-            <button class="btn btn-sm btn-outline-danger delete-meal">🗑️</button>
+            <button class="btn btn-sm btn-outline-secondary me-1 edit-meal" aria-label="Editar comida">✏️</button>
+            <button class="btn btn-sm btn-outline-danger delete-meal" aria-label="Eliminar comida">🗑️</button>
           </div>
         </div>
+      {% else %}
+        <div class="text-muted">Aún no hay comidas hoy.</div>
       {% endfor %}
     </div>
   </div>
@@ -31,7 +45,7 @@
   <!-- Totales -->
   <div class="mb-4">
     <h5>Totales</h5>
-    <ul class="list-unstyled">
+    <ul class="list-unstyled" id="totals-box">
       <li>Kcal: <span id="total-kcal">{{ total_kcal }}</span></li>
       <li>Proteínas: <span id="total-protein">{{ total_proteinas }}</span> g</li>
       <li>Carbs: <span id="total-carbs">{{ total_carbs }}</span> g</li>
@@ -40,7 +54,7 @@
   </div>
 
   <!-- Formulario AJAX de añadir comida -->
-  <form id="add-meal-form" class="mb-5">
+  <form id="add-meal-form" class="mb-5" novalidate>
     <div class="mb-3 position-relative">
       <label for="food-search" class="form-label">Buscar alimento</label>
       <input
@@ -48,11 +62,14 @@
         id="food-search"
         class="form-control"
         placeholder="Escribe al menos 2 letras"
-        autocomplete="off">
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="suggestions">
       <ul
         id="suggestions"
         class="list-group position-absolute w-100"
-        style="z-index:1000; max-height:200px; overflow-y:auto;"></ul>
+        style="z-index:1000; max-height:240px; overflow-y:auto;"
+        role="listbox"></ul>
       <input type="hidden" name="food_id" id="food-id">
     </div>
 
@@ -65,6 +82,7 @@
         class="form-control"
         step="any"
         min="0.01"
+        inputmode="decimal"
         required>
     </div>
 
@@ -93,13 +111,13 @@
 </div>
 
 <!-- Modal de creación de alimento -->
-<div class="modal fade" id="foodModal" tabindex="-1">
+<div class="modal fade" id="foodModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <form id="create-food-form">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Crear nuevo alimento</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <div class="row g-3 mb-3">
@@ -121,16 +139,16 @@
             </div>
           </div>
           <div class="row g-3 mb-3">
-            <div class="col"><label class="form-label">Kcal/100g</label><input type="number" id="food-kcal100" class="form-control" step="any"></div>
-            <div class="col"><label class="form-label">Prot/100g</label><input type="number" id="food-prot100" class="form-control" step="any"></div>
-            <div class="col"><label class="form-label">Carbs/100g</label><input type="number" id="food-carbs100" class="form-control" step="any"></div>
-            <div class="col"><label class="form-label">Fat/100g</label><input type="number" id="food-fat100" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Kcal/100g</label><input type="number" id="food-kcal100" class="form-control" step="any" min="0"></div>
+            <div class="col"><label class="form-label">Prot/100g</label><input type="number" id="food-prot100" class="form-control" step="any" min="0"></div>
+            <div class="col"><label class="form-label">Carbs/100g</label><input type="number" id="food-carbs100" class="form-control" step="any" min="0"></div>
+            <div class="col"><label class="form-label">Fat/100g</label><input type="number" id="food-fat100" class="form-control" step="any" min="0"></div>
           </div>
           <div class="row g-3">
-            <div class="col"><label class="form-label">Kcal/unidad</label><input type="number" id="food-kcal1" class="form-control" step="any"></div>
-            <div class="col"><label class="form-label">Prot/unidad</label><input type="number" id="food-prot1" class="form-control" step="any"></div>
-            <div class="col"><label class="form-label">Carbs/unidad</label><input type="number" id="food-carbs1" class="form-control" step="any"></div>
-            <div class="col"><label class="form-label">Fat/unidad</label><input type="number" id="food-fat1" class="form-control" step="any"></div>
+            <div class="col"><label class="form-label">Kcal/unidad</label><input type="number" id="food-kcal1" class="form-control" step="any" min="0"></div>
+            <div class="col"><label class="form-label">Prot/unidad</label><input type="number" id="food-prot1" class="form-control" step="any" min="0"></div>
+            <div class="col"><label class="form-label">Carbs/unidad</label><input type="number" id="food-carbs1" class="form-control" step="any" min="0"></div>
+            <div class="col"><label class="form-label">Fat/unidad</label><input type="number" id="food-fat1" class="form-control" step="any" min="0"></div>
           </div>
         </div>
         <div class="modal-footer">
@@ -148,12 +166,32 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const searchInput    = document.getElementById('food-search');
-  const suggestionsBox = document.getElementById('suggestions');
-  const foodIdInput    = document.getElementById('food-id');
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const suggestionsBox = $('#suggestions');
+  const searchInput    = $('#food-search');
+  const foodIdInput    = $('#food-id');
+  const mealsList      = $('#today-meals-list');
+  const totalsBox      = $('#totals-box');
   let debounceTimer;
 
-  // 1) Autocomplete
+  // Helper fetch JSON
+  async function jsonFetch(url, opts={}){
+    const res = await fetch(url, {
+      headers: { 'Content-Type':'application/json', ...(opts.headers||{}) },
+      credentials: 'same-origin',
+      ...opts
+    });
+    let data = null;
+    try { data = await res.json(); } catch(_) { data = null; }
+    if (!res.ok) {
+      const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  // ---- 1) Autocomplete (mantiene tu endpoint: /api/foods?search=) ----
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
@@ -162,29 +200,34 @@ document.addEventListener('DOMContentLoaded', () => {
       foodIdInput.value = '';
       return;
     }
-    debounceTimer = setTimeout(() => {
-      fetch(`/api/foods?search=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
-          suggestionsBox.innerHTML = '';
-          if (!data.foods.length) {
-            suggestionsBox.innerHTML = '<li class="list-group-item text-muted">No se encontraron alimentos.</li>';
-            return;
-          }
-          data.foods.forEach(item => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item list-group-item-action';
-            li.innerHTML = `<strong>${item.name}</strong> <small class="text-muted">(${item.macros_per_100g.kcal} kcal/100g)</small>`;
-            li.style.cursor = 'pointer';
-            li.addEventListener('click', () => {
-              searchInput.value    = item.name;
-              foodIdInput.value    = item.id;
-              suggestionsBox.innerHTML = '';
-            });
-            suggestionsBox.appendChild(li);
+    debounceTimer = setTimeout(async () => {
+      try{
+        const data = await jsonFetch(`/api/foods?search=${encodeURIComponent(q)}`);
+        const foods = data.foods || [];
+        suggestionsBox.innerHTML = '';
+        if (!foods.length) {
+          suggestionsBox.innerHTML = '<li class="list-group-item text-muted">No se encontraron alimentos.</li>';
+          return;
+        }
+        for (const item of foods) {
+          const li = document.createElement('li');
+          li.className = 'list-group-item list-group-item-action';
+          li.setAttribute('role', 'option');
+          const kcal100 = item?.macros_per_100g?.kcal ?? 0;
+          li.innerHTML = `<strong>${escapeHtml(item.name)}</strong> <small class="text-muted">(${kcal100} kcal/100g)</small>`;
+          li.style.cursor = 'pointer';
+          li.addEventListener('click', () => {
+            searchInput.value    = item.name;
+            foodIdInput.value    = item.id;
+            suggestionsBox.innerHTML = '';
+            $('#quantity')?.focus();
           });
-        });
-    }, 300);
+          suggestionsBox.appendChild(li);
+        }
+      }catch(e){
+        suggestionsBox.innerHTML = `<li class="list-group-item text-danger">Error: ${escapeHtml(e.message)}</li>`;
+      }
+    }, 250);
   });
 
   document.addEventListener('click', e => {
@@ -193,134 +236,178 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 2) Crear alimento desde modal
-  document.getElementById('create-food-form').addEventListener('submit', e => {
+  // ---- 2) Crear alimento desde modal (mantiene tu payload) ----
+  $('#create-food-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
-      name: document.getElementById('food-name').value.trim(),
-      default_unit: document.getElementById('food-unit').value,
-      default_quantity: parseFloat(document.getElementById('food-quantity').value),
-      kcal_per_100g: parseFloat(document.getElementById('food-kcal100').value) || 0,
-      protein_per_100g: parseFloat(document.getElementById('food-prot100').value) || 0,
-      carbs_per_100g: parseFloat(document.getElementById('food-carbs100').value) || 0,
-      fat_per_100g: parseFloat(document.getElementById('food-fat100').value) || 0,
-      kcal_per_unit: parseFloat(document.getElementById('food-kcal1').value) || null,
-      protein_per_unit: parseFloat(document.getElementById('food-prot1').value) || null,
-      carbs_per_unit: parseFloat(document.getElementById('food-carbs1').value) || null,
-      fat_per_unit: parseFloat(document.getElementById('food-fat1').value) || null
+      name: $('#food-name').value.trim(),
+      default_unit: $('#food-unit').value,
+      default_quantity: parseFloat($('#food-quantity').value),
+      kcal_per_100g: parseFloat($('#food-kcal100').value) || 0,
+      protein_per_100g: parseFloat($('#food-prot100').value) || 0,
+      carbs_per_100g: parseFloat($('#food-carbs100').value) || 0,
+      fat_per_100g: parseFloat($('#food-fat100').value) || 0,
+      kcal_per_unit: parseFloat($('#food-kcal1').value) || null,
+      protein_per_unit: parseFloat($('#food-prot1').value) || null,
+      carbs_per_unit: parseFloat($('#food-carbs1').value) || null,
+      fat_per_unit: parseFloat($('#food-fat1').value) || null
     };
-    fetch('/api/foods', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(r => r.json().then(data => ({status:r.status,data})))
-    .then(({status,data}) => {
-      if (status!==201) throw data;
+    try{
+      const data = await jsonFetch('/api/foods', { method:'POST', body: JSON.stringify(payload) });
       searchInput.value = data.food.name;
       foodIdInput.value = data.food.id;
       bootstrap.Modal.getInstance(document.getElementById('foodModal')).hide();
-    })
-    .catch(err => alert(err.message || Object.values(err.fields||{})[0] || 'Error al crear el alimento'));
+      $('#quantity')?.focus();
+    }catch(e){
+      alert(e.message || 'Error al crear el alimento');
+    }
   });
 
-  // 3) Añadir comida (POST AJAX)
-  document.getElementById('add-meal-form').addEventListener('submit', e => {
+  // ---- 3) Añadir comida (POST AJAX) ----
+  $('#add-meal-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
       food_id: parseInt(foodIdInput.value),
-      quantity: parseFloat(document.getElementById('quantity').value),
-      meal_type: document.getElementById('meal_type').value
+      quantity: parseFloat($('#quantity').value),
+      meal_type: $('#meal_type').value
     };
-    fetch('/api/meals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(r => r.json().then(data => ({status:r.status,data})))
-    .then(({status,data}) => {
-      if (status!==201) throw data;
-      const m = data.meal;
-      // Añadir fila al listado
-      const list = document.getElementById('today-meals-list');
-      const row = document.createElement('div');
-      row.className = 'd-flex justify-content-between align-items-center py-1 border-bottom meal-row';
-      row.dataset.mealId = m.id;
-      row.innerHTML = `
-        <div>
-          <strong>${m.time}</strong> —
-          ${m.food.name} (<span class="meal-quantity">${m.quantity}</span> ${m.food.default_unit})
-        </div>
-        <div class="d-flex align-items-center">
-          <span class="me-3"><span class="meal-calories">${m.calories}</span> kcal</span>
-          <button class="btn btn-sm btn-outline-secondary me-1 edit-meal">✏️</button>
-          <button class="btn btn-sm btn-outline-danger delete-meal">🗑️</button>
-        </div>`;
-      list.appendChild(row);
-      recalcTotals();
+    if (!payload.food_id) return alert('Elige un alimento de la lista.');
+    if (!payload.quantity || payload.quantity <= 0) return alert('Cantidad inválida.');
+    try{
+      const resp = await jsonFetch('/api/meals', { method:'POST', body: JSON.stringify(payload) });
+      const m = resp.meal;
+      appendMealRow(m);
+      await refreshTotals(); // servidor si existe stats
       // reset
-      searchInput.value    = '';
-      foodIdInput.value    = '';
-      document.getElementById('quantity').value = '';
+      searchInput.value = '';
+      foodIdInput.value = '';
+      $('#quantity').value = '';
       suggestionsBox.innerHTML = '';
-    })
-    .catch(err => alert(err.message || Object.values(err.fields||{})[0] || 'Error al añadir comida'));
+    }catch(e){
+      alert(e.message || 'Error al añadir comida');
+    }
   });
 
-  // 4) Editar y borrar (event delegation)
-  document.getElementById('today-meals-list').addEventListener('click', e => {
-    const row = e.target.closest('.meal-row');
-    if (!row) return;
+  // ---- 4) Editar y borrar (delegación) ----
+  mealsList.addEventListener('click', async (e) => {
+    const row = e.target.closest('.meal-row'); if (!row) return;
     const id = row.dataset.mealId;
 
     // Borrar
     if (e.target.matches('.delete-meal')) {
       if (!confirm('¿Eliminar esta comida?')) return;
-      fetch(`/api/meals/${id}`, { method: 'DELETE' })
-        .then(r => {
-          if (r.ok) {
-            row.remove();
-            recalcTotals();
-          } else {
-            r.json().then(d => alert(d.message || 'Error al borrar'));
-          }
-        });
+      try{
+        await jsonFetch(`/api/meals/${id}`, { method: 'DELETE' });
+        row.remove();
+        await refreshTotals();
+      }catch(err){
+        alert(err.message || 'Error al borrar');
+      }
     }
 
-    // Editar
+    // Editar cantidad
     if (e.target.matches('.edit-meal')) {
       const qtySpan = row.querySelector('.meal-quantity');
-      const calSpan = row.querySelector('.meal-calories');
       const oldQty  = parseFloat(qtySpan.textContent);
-      const oldCal  = parseInt(calSpan.textContent);
       const n       = prompt('Nueva cantidad:', oldQty);
       if (n === null) return;
       const newQty = parseFloat(n);
       if (isNaN(newQty) || newQty <= 0) return alert('Cantidad inválida');
 
-      fetch(`/api/meals/${id}`, {
-        method: 'PUT',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ quantity: newQty })
-      })
-      .then(r => r.json().then(d => ({status:r.status,d})))
-      .then(({status,d}) => {
-        if (status!==200) throw d;
-        qtySpan.textContent = d.meal.quantity;
-        calSpan.textContent = d.meal.calories;
-        recalcTotals();
-      })
-      .catch(err => alert(err.message || Object.values(err.fields||{})[0] || 'Error al editar comida'));
+      try{
+        const { meal } = await jsonFetch(`/api/meals/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ quantity: newQty })
+        });
+        // Actualiza fila
+        qtySpan.textContent = meal.quantity;
+        row.querySelector('.meal-calories').textContent = meal.calories;
+        // Si backend devuelve macros, actualízalas y data-*
+        if (typeof meal.protein !== 'undefined') {
+          row.dataset.protein = meal.protein;
+          const p = row.querySelector('.meal-protein'); if (p) p.textContent = meal.protein;
+        }
+        if (typeof meal.carbs !== 'undefined') {
+          row.dataset.carbs = meal.carbs;
+          const c = row.querySelector('.meal-carbs'); if (c) c.textContent = meal.carbs;
+        }
+        if (typeof meal.fats !== 'undefined') {
+          row.dataset.fats = meal.fats;
+          const f = row.querySelector('.meal-fats'); if (f) f.textContent = meal.fats;
+        }
+        await refreshTotals();
+      }catch(err){
+        alert(err.message || 'Error al editar comida');
+      }
     }
   });
 
-  // Helper: recalcula totales
-  function recalcTotals(){
-    let tk=0, tp=0, tc=0, tf=0;
-    document.querySelectorAll('.meal-row').forEach(r=>{
-      tk += parseInt(r.querySelector('.meal-calories').textContent);
-    });
-    document.getElementById('total-kcal').textContent = tk;
+  // ---- Helpers UI ----
+  function appendMealRow(m){
+    const row = document.createElement('div');
+    row.className = 'd-flex justify-content-between align-items-center py-1 border-bottom meal-row';
+    row.dataset.mealId = m.id;
+    if (typeof m.protein !== 'undefined') row.dataset.protein = m.protein;
+    if (typeof m.carbs !== 'undefined')   row.dataset.carbs   = m.carbs;
+    if (typeof m.fats !== 'undefined')    row.dataset.fats    = m.fats;
+    if (typeof m.calories !== 'undefined')row.dataset.kcal    = m.calories;
+
+    const macrosHtml = (['protein','carbs','fats'].every(k => typeof m[k] !== 'undefined'))
+      ? `<small class="text-muted d-inline-block ms-2">
+           <span class="meal-protein">${m.protein}</span>P ·
+           <span class="meal-carbs">${m.carbs}</span>C ·
+           <span class="meal-fats">${m.fats}</span>G
+         </small>`
+      : '';
+
+    row.innerHTML = `
+      <div>
+        <strong class="meal-time">${escapeHtml(m.time || '')}</strong> —
+        ${escapeHtml(m.food?.name || m.food_name || '')}
+        (<span class="meal-quantity">${m.quantity}</span> ${escapeHtml(m.food?.default_unit || m.food_default_unit || '')})
+        ${macrosHtml}
+      </div>
+      <div class="d-flex align-items-center">
+        <span class="me-3"><span class="meal-calories">${m.calories}</span> kcal</span>
+        <button class="btn btn-sm btn-outline-secondary me-1 edit-meal" aria-label="Editar comida">✏️</button>
+        <button class="btn btn-sm btn-outline-danger delete-meal" aria-label="Eliminar comida">🗑️</button>
+      </div>`;
+    mealsList.appendChild(row);
+  }
+
+  // Refresca totales: intenta /api/meals/stats?date=YYYY-MM-DD, si falla recurre a DOM
+  async function refreshTotals(){
+    const todayISO = new Date().toISOString().slice(0,10);
+    try{
+      const data = await jsonFetch(`/api/meals/stats?date=${todayISO}`);
+      $('#total-kcal').textContent    = data.total?.kcal ?? 0;
+      $('#total-protein').textContent = data.total?.protein ?? 0;
+      $('#total-carbs').textContent   = data.total?.carbs ?? 0;
+      $('#total-fats').textContent    = data.total?.fat ?? 0;
+    }catch(_){
+      // Fallback: suma de la UI (solo si hay datos)
+      let tk=0, tp=0, tc=0, tf=0;
+      $$('.meal-row').forEach(r=>{
+        const kcal = parseFloat(r.querySelector('.meal-calories')?.textContent || r.dataset.kcal || 0) || 0;
+        tk += kcal;
+        tp += parseFloat(r.dataset.protein || r.querySelector('.meal-protein')?.textContent || 0) || 0;
+        tc += parseFloat(r.dataset.carbs   || r.querySelector('.meal-carbs')?.textContent   || 0) || 0;
+        tf += parseFloat(r.dataset.fats    || r.querySelector('.meal-fats')?.textContent    || 0) || 0;
+      });
+      $('#total-kcal').textContent    = Math.round(tk);
+      $('#total-protein').textContent = Math.round(tp);
+      $('#total-carbs').textContent   = Math.round(tc);
+      $('#total-fats').textContent    = Math.round(tf);
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s || '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
   }
 });
 </script>

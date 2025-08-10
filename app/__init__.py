@@ -10,13 +10,14 @@ from flask_migrate import Migrate
 # 1. Carga variables de entorno desde .env
 load_dotenv()
 
-# 2. Inicializa extensiones
+# 2. Inicializa extensiones (sin app aún)
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
 
 
 def create_app():
+    """Factory principal de la aplicación."""
     # 3. Crea la app con configuración de instancia
     app = Flask(__name__, instance_relative_config=True)
 
@@ -32,6 +33,7 @@ def create_app():
         SECRET_KEY=os.getenv("SECRET_KEY", "dev"),
         SQLALCHEMY_DATABASE_URI=os.getenv("SQLALCHEMY_DATABASE_URI", default_db_uri),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        JSON_SORT_KEYS=False,  # evita reordenar claves en JSON (mejor para APIs/front)
     )
 
     # 7. Inicializa extensiones con la app
@@ -41,10 +43,11 @@ def create_app():
     login_manager.login_view = "auth.login"
 
     # 8. Importa modelos para que las migraciones los detecten
-    from app.models.user import User, Profile, Meal
-    from app.models.food import Food
+    #    (import después de init_app para que SQLAlchemy tenga contexto)
+    from app.models.user import User, Profile, Meal  # noqa: F401
+    from app.models.food import Food  # noqa: F401
 
-    # 9. Registra blueprints (solo aquí, sin volver a pasar url_prefix)
+    # 9. Registra blueprints
     from app.routes.auth import auth_routes
     app.register_blueprint(auth_routes)
 
@@ -60,8 +63,8 @@ def create_app():
     from app.routes.nutrition import nutrition as nutrition_bp
     app.register_blueprint(nutrition_bp)
 
-    # 10. Comandos personalizados CLI
-    from app.commands import seed_foods
-    app.cli.add_command(seed_foods)
+    # 10. Registra CLI (seed, etc.) desde app/cli
+    from app.cli import register_cli
+    register_cli(app)
 
     return app
