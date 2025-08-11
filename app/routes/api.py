@@ -11,25 +11,27 @@ from app.utils.calculos import calcular_edad, calcular_bmr, calcular_tdee
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
+ALLOWED_UNITS = {"g", "ml", "unidad"}
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # Helpers
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 def _food_to_dict(f: Food):
     """Serializa un Food para JSON."""
     m100 = {
-        "kcal": f.kcal_per_100g or 0,
+        "kcal":    f.kcal_per_100g or 0,
         "protein": f.protein_per_100g or 0,
-        "carbs": f.carbs_per_100g or 0,
-        "fat": f.fat_per_100g or 0,
+        "carbs":   f.carbs_per_100g or 0,
+        "fat":     f.fat_per_100g or 0,
     }
     mu = None
     if f.kcal_per_unit is not None:
         mu = {
-            "kcal": f.kcal_per_unit,
+            "kcal":    f.kcal_per_unit,
             "protein": f.protein_per_unit or 0,
-            "carbs": f.carbs_per_unit or 0,
-            "fat": f.fat_per_unit or 0,
+            "carbs":   f.carbs_per_unit or 0,
+            "fat":     f.fat_per_unit or 0,
         }
     return {
         "id": f.id,
@@ -37,7 +39,8 @@ def _food_to_dict(f: Food):
         "default_unit": f.default_unit,
         "default_quantity": f.default_quantity,
         "macros_per_100g": m100,
-        "macros_per_unit": mu
+        "macros_per_unit": mu,
+        "available_units": list(ALLOWED_UNITS),
     }
 
 
@@ -47,35 +50,44 @@ def _meal_to_dict(m: Meal):
         "id": m.id,
         "food": _food_to_dict(m.food),
         "quantity": m.quantity,
+        "unit": m.unit,
         "meal_type": m.meal_type,
         "date": m.date.isoformat(),
         "time": m.time.isoformat(),
         "calories": m.calories,
         "protein": m.protein,
         "carbs": m.carbs,
-        "fats": m.fats
+        "fats": m.fats,
     }
 
 
 def _compute_macros(food: Food, qty: float, unit: str):
-    """Calcula macros según unidad (por unidad si existe; si no, por 100g)."""
-    if unit == food.default_unit and food.kcal_per_unit is not None:
-        factor = qty
-        kcal_base    = food.kcal_per_unit
-        protein_base = food.protein_per_unit or 0
-        carbs_base   = food.carbs_per_unit or 0
-        fat_base     = food.fat_per_unit or 0
+    """
+    Regla robusta:
+      - Si unit == 'unidad' y el alimento tiene *_per_unit -> usar *_per_unit.
+      - En otro caso (g/ml) -> usar *_per_100g con factor (qty / 100).
+    """
+    unit = (unit or "").lower()
+    use_per_unit = (unit == "unidad" and food.kcal_per_unit is not None)
+
+    if use_per_unit:
+        factor     = qty
+        kcal_base  = food.kcal_per_unit or 0
+        protein_b  = food.protein_per_unit or 0
+        carbs_b    = food.carbs_per_unit or 0
+        fat_b      = food.fat_per_unit or 0
     else:
-        factor = qty / 100.0
-        kcal_base    = food.kcal_per_100g or 0
-        protein_base = food.protein_per_100g or 0
-        carbs_base   = food.carbs_per_100g or 0
-        fat_base     = food.fat_per_100g or 0
+        factor     = qty / 100.0
+        kcal_base  = food.kcal_per_100g or 0
+        protein_b  = food.protein_per_100g or 0
+        carbs_b    = food.carbs_per_100g or 0
+        fat_b      = food.fat_per_100g or 0
+
     return {
-        "kcal":    kcal_base    * factor,
-        "protein": protein_base * factor,
-        "carbs":   carbs_base   * factor,
-        "fat":     fat_base     * factor
+        "kcal":    kcal_base * factor,
+        "protein": protein_b * factor,
+        "carbs":   carbs_b * factor,
+        "fat":     fat_b * factor,
     }
 
 
@@ -88,7 +100,7 @@ def _get_profile(user_id):
 
 
 def _ensure_goals(profile: Profile) -> Profile:
-    """Garantiza que el perfil tiene estructuras de objetivos/config inicializadas."""
+    """Garantiza estructuras de objetivos/config inicializadas."""
     if not profile:
         return None
     changed = False
@@ -124,17 +136,14 @@ def _distribute_macros(daily_goals: dict, pct: float) -> dict:
     g = daily_goals or {}
     return {
         "kcal":   _scale(g.get("kcal", 0), pct),
-        "protein": round((g.get("protein", 0) or 0) * (pct/100.0)),
-        "carbs":   round((g.get("carbs", 0)   or 0) * (pct/100.0)),
-        "fat":     round((g.get("fat", 0)     or 0) * (pct/100.0)),
+        "protein": round((g.get("protein", 0) or 0) * (pct / 100.0)),
+        "carbs":   round((g.get("carbs", 0)   or 0) * (pct / 100.0)),
+        "fat":     round((g.get("fat", 0)     or 0) * (pct / 100.0)),
     }
 
 
 def _apply_training_mods(base_meal_goals: dict, meal_dt: datetime, trainings: list, mods: dict) -> dict:
-    """
-    Aplica ajustes pre/post si la hora de la comida cae en ventanas relativas a sesiones.
-    trainings: lista de dicts con al menos {"start": datetime}.
-    """
+    """Aplica ajustes pre/post si la hora de la comida cae en ventanas relativas a sesiones."""
     if not trainings:
         return base_meal_goals
     out = dict(base_meal_goals)
@@ -156,9 +165,9 @@ def _apply_training_mods(base_meal_goals: dict, meal_dt: datetime, trainings: li
     return out
 
 
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 # PROFILE
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @api.route("/profile", methods=["GET"])
 @login_required
 def get_profile():
@@ -207,9 +216,9 @@ def update_profile():
     return jsonify(message="Perfil actualizado"), 200
 
 
-# -----------------------------------------------------------------------------
-# GOALS (nuevo)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
+# GOALS
+# -----------------------------------------------------------------------------#
 @api.route("/goals/daily", methods=["GET"])
 @login_required
 def get_daily_goals():
@@ -228,9 +237,8 @@ def get_daily_goals():
 @login_required
 def get_meal_goals():
     """
-    Objetivos por comida ya distribuidos (con tolerancias, listos para mods pre/post).
+    Objetivos por comida ya distribuidos.
     Query: ?date=YYYY-MM-DD (opcional, hoy por defecto)
-    Nota: los mods pre/post se aplicarán cuando haya entrenos conectados; dejamos placeholder.
     """
     date_str = request.args.get("date") or _today_iso()
     prof = _ensure_goals(_get_profile(current_user.id))
@@ -250,7 +258,7 @@ def get_meal_goals():
     for name in meals_order:
         pct = float(dist.get(name, 0))
         base = _distribute_macros(daily, pct)
-        # Heurística de hora para aplicar mods (hasta tener hora real en UI)
+        # Heurística de hora hasta tener hora real desde UI
         try:
             hh = int(default_hours.get(name, 12))
             meal_dt = datetime.fromisoformat(f"{date_str}T{hh:02d}:00:00")
@@ -267,9 +275,9 @@ def get_meal_goals():
     })
 
 
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 # FOODS
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @api.route("/foods", methods=["GET"])
 @login_required
 def get_foods():
@@ -286,6 +294,15 @@ def get_foods():
     if q:
         suggestions = search_off(q, limit=10, timeout=5)
     return jsonify(foods=[], suggestions=suggestions), 200
+
+
+@api.route("/foods/<int:food_id>", methods=["GET"])
+@login_required
+def get_food(food_id):
+    f = db.session.get(Food, food_id)
+    if not f:
+        return jsonify(error="FoodNotFound"), 404
+    return jsonify(food=_food_to_dict(f)), 200
 
 
 @api.route("/foods", methods=["POST"])
@@ -336,9 +353,9 @@ def create_food():
     return jsonify(food=_food_to_dict(f)), 201
 
 
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 # MEALS
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @api.route("/meals", methods=["GET"])
 @login_required
 def list_meals():
@@ -349,10 +366,12 @@ def list_meals():
     except ValueError:
         return jsonify(error="InvalidDate", message="Formato YYYY-MM-DD"), 422
 
-    meals = (Meal.query
-             .filter_by(user_id=current_user.id, date=target)
-             .order_by(Meal.time.asc())
-             .all())
+    meals = (
+        Meal.query
+        .filter_by(user_id=current_user.id, date=target)
+        .order_by(Meal.time.asc())
+        .all()
+    )
     return jsonify(meals=[_meal_to_dict(m) for m in meals]), 200
 
 
@@ -366,7 +385,7 @@ def create_meal():
     data = request.get_json() or {}
     errors = {}
 
-    # validar food_id
+    # food
     try:
         food = db.session.get(Food, int(data.get("food_id", 0)))
         if not food:
@@ -374,7 +393,7 @@ def create_meal():
     except (ValueError, TypeError):
         errors["food_id"] = "ID inválido"
 
-    # validar quantity
+    # quantity
     try:
         qty = float(data.get("quantity", 0))
         if qty <= 0:
@@ -382,12 +401,20 @@ def create_meal():
     except (ValueError, TypeError):
         errors["quantity"] = "Cantidad inválida"
 
-    # validar meal_type dinámico según perfil
+    # meal_type permitido según perfil
     mtype = (data.get("meal_type") or "").strip().lower()
     prof = _ensure_goals(_get_profile(current_user.id))
-    allowed = set(prof.meals_order() if prof else ["desayuno", "almuerzo", "comida", "merienda", "cena"])
-    if not mtype or mtype not in allowed:
-        errors["meal_type"] = f"Tipo inválido. Permitidos: {', '.join(allowed)}"
+    allowed_types = set(prof.meals_order() if prof else ["desayuno", "almuerzo", "comida", "merienda", "cena"])
+    if not mtype or mtype not in allowed_types:
+        errors["meal_type"] = f"Tipo inválido. Permitidos: {', '.join(allowed_types)}"
+
+    # unit
+    unit = (data.get("unit") or "").lower().strip()
+    if not unit:
+        # fallback inteligente
+        unit = "unidad" if food and food.kcal_per_unit is not None else (food.default_unit or "g") if food else "g"
+    if unit not in ALLOWED_UNITS:
+        errors["unit"] = f"Unidad inválida. Usa: {', '.join(sorted(ALLOWED_UNITS))}"
 
     if errors:
         return jsonify(error="ValidationError", fields=errors), 422
@@ -404,20 +431,21 @@ def create_meal():
         return jsonify(error="InvalidTime", message="Formato HH:MM:SS"), 422
 
     # crear + cachés
+    macros = _compute_macros(food, qty, unit)
+
     m = Meal(
         user_id=current_user.id,
         food_id=food.id,
         quantity=qty,
+        unit=unit,
         meal_type=mtype,
         date=dt_date,
-        time=dt_time
+        time=dt_time,
+        calories=int(round(macros["kcal"])),
+        protein=int(round(macros["protein"])),
+        carbs=int(round(macros["carbs"])),
+        fats=int(round(macros["fat"])),
     )
-    m.food = food
-    macros = _compute_macros(food, qty, data.get("unit", food.default_unit))
-    m.calories = int(round(macros["kcal"]))
-    m.protein  = int(round(macros["protein"]))
-    m.carbs    = int(round(macros["carbs"]))
-    m.fats     = int(round(macros["fat"]))
 
     db.session.add(m)
     db.session.commit()
@@ -429,7 +457,7 @@ def create_meal():
 def update_meal(meal_id):
     """
     Actualiza una comida.
-    JSON: cualquiera de {date, time, quantity, food_id, meal_type}
+    JSON permitido: {date, time, quantity, food_id, meal_type, unit}
     """
     m = Meal.query.filter_by(id=meal_id, user_id=current_user.id).first()
     if not m:
@@ -452,9 +480,23 @@ def update_meal(meal_id):
         if (data["meal_type"] or "").lower() not in allowed:
             errors["meal_type"] = f"Tipo inválido. Permitidos: {', '.join(allowed)}"
 
+    if "unit" in data:
+        u = (data.get("unit") or "").lower()
+        if u not in ALLOWED_UNITS:
+            errors["unit"] = f"Unidad inválida. Usa: {', '.join(sorted(ALLOWED_UNITS))}"
+
+    if "food_id" in data:
+        try:
+            f2 = db.session.get(Food, int(data["food_id"]))
+            if not f2:
+                errors["food_id"] = "Alimento no encontrado"
+        except (ValueError, TypeError):
+            errors["food_id"] = "ID inválido"
+
     if errors:
         return jsonify(error="ValidationError", fields=errors), 422
 
+    # aplicar y recalcular (el modelo ya refresca food si cambia food_id)
     try:
         m.update_from_dict(data)
         db.session.commit()
@@ -476,9 +518,9 @@ def delete_meal(meal_id):
     return jsonify(message="Comida eliminada"), 200
 
 
-# -----------------------------------------------------------------------------
-# STATS (mejorado)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
+# STATS
+# -----------------------------------------------------------------------------#
 @api.route("/meals/stats", methods=["GET"])
 @login_required
 def meals_stats():
@@ -510,7 +552,6 @@ def meals_stats():
         base_keys = prof.meals_order() if prof else ["desayuno", "almuerzo", "comida", "merienda", "cena"]
 
         buckets = {k: [] for k in base_keys}
-        # incluye también tipos no previstos que el usuario haya usado
         for m in q:
             key = (m.meal_type or "otros").lower()
             buckets.setdefault(key, [])

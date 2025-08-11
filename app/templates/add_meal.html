@@ -10,29 +10,36 @@
     <h5>Comidas añadidas</h5>
     <div id="today-meals-list" aria-live="polite">
       {% for m in meals %}
-        <div class="d-flex justify-content-between align-items-center py-1 border-bottom meal-row"
-             data-meal-id="{{ m.id }}"
-             {% if m.protein is defined %}data-protein="{{ m.protein }}"{% endif %}
-             {% if m.carbs is defined %}data-carbs="{{ m.carbs }}"{% endif %}
-             {% if m.fats is defined %}data-fats="{{ m.fats }}"{% endif %}
-             {% if m.calories is defined %}data-kcal="{{ m.calories }}"{% endif %}>
-          <div>
+        <div
+          class="d-flex justify-content-between align-items-center py-1 border-bottom meal-row"
+          data-meal-id="{{ m.id }}"
+          data-unit="{{ m.unit or m.food.default_unit }}"
+          data-kcal="{{ m.calories }}"
+          data-protein="{{ m.protein }}"
+          data-carbs="{{ m.carbs }}"
+          data-fats="{{ m.fats }}"
+        >
+          <div class="me-2">
             <strong class="meal-time">{{ m.time }}</strong> —
             {{ m.food.name }}
-            (<span class="meal-quantity">{{ m.quantity }}</span> {{ m.food.default_unit }})
-            {% if m.protein is defined and m.carbs is defined and m.fats is defined %}
-              <small class="text-muted d-inline-block ms-2">
-                <span class="meal-protein">{{ m.protein }}</span>P ·
-                <span class="meal-carbs">{{ m.carbs }}</span>C ·
-                <span class="meal-fats">{{ m.fats }}</span>G
-              </small>
-            {% endif %}
+            (<span class="meal-quantity">{{ m.quantity }}</span>
+             <span class="meal-unit">{{ m.unit or m.food.default_unit }}</span>)
+            <small class="text-muted d-inline-block ms-2">
+              <span class="meal-protein">{{ m.protein }}</span>P ·
+              <span class="meal-carbs">{{ m.carbs }}</span>C ·
+              <span class="meal-fats">{{ m.fats }}</span>G
+            </small>
           </div>
-          <div class="d-flex align-items-center">
+          <div class="d-flex align-items-center gap-1">
+            <!-- Microajuste -->
+            <div class="btn-group btn-group-sm me-2" role="group" aria-label="Ajustar cantidad">
+              <button class="btn btn-outline-secondary qty-minus" title="Restar">−</button>
+              <button class="btn btn-outline-secondary qty-plus" title="Sumar">+</button>
+            </div>
             <span class="me-3">
               <span class="meal-calories">{{ m.calories }}</span> kcal
             </span>
-            <button class="btn btn-sm btn-outline-secondary me-1 edit-meal" aria-label="Editar comida">✏️</button>
+            <button class="btn btn-sm btn-outline-secondary me-1 edit-meal" aria-label="Editar cantidad">✏️</button>
             <button class="btn btn-sm btn-outline-danger delete-meal" aria-label="Eliminar comida">🗑️</button>
           </div>
         </div>
@@ -47,9 +54,9 @@
     <h5>Totales</h5>
     <ul class="list-unstyled" id="totals-box">
       <li>Kcal: <span id="total-kcal">{{ total_kcal }}</span></li>
-      <li>Proteínas: <span id="total-protein">{{ total_proteinas }}</span> g</li>
+      <li>Proteínas: <span id="total-protein">{{ total_protein }}</span> g</li>
       <li>Carbs: <span id="total-carbs">{{ total_carbs }}</span> g</li>
-      <li>Grasas: <span id="total-fats">{{ total_grasas }}</span> g</li>
+      <li>Grasas: <span id="total-fats">{{ total_fats }}</span> g</li>
     </ul>
   </div>
 
@@ -73,30 +80,51 @@
       <input type="hidden" name="food_id" id="food-id">
     </div>
 
-    <div class="mb-3">
-      <label for="quantity" class="form-label">Cantidad</label>
-      <input
-        type="number"
-        name="quantity"
-        id="quantity"
-        class="form-control"
-        step="any"
-        min="0.01"
-        inputmode="decimal"
-        required>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label for="quantity" class="form-label">Cantidad</label>
+        <input
+          type="number"
+          name="quantity"
+          id="quantity"
+          class="form-control"
+          step="any"
+          min="0.01"
+          inputmode="decimal"
+          required>
+      </div>
+      <div class="col-md-4">
+        <fieldset>
+          <legend class="form-label fs-6 mb-1">Unidad</legend>
+          <div class="d-flex gap-3 align-items-center" id="unit-picker">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="unit" id="unit-g" value="g" checked>
+              <label class="form-check-label" for="unit-g">g</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="unit" id="unit-ml" value="ml">
+              <label class="form-check-label" for="unit-ml">ml</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="unit" id="unit-unidad" value="unidad">
+              <label class="form-check-label" for="unit-unidad">unidad</label>
+            </div>
+          </div>
+        </fieldset>
+      </div>
+      <div class="col-md-4">
+        <label for="meal_type" class="form-label">Tipo de comida</label>
+        <select name="meal_type" id="meal_type" class="form-select" required>
+          <option value="desayuno">Desayuno</option>
+          <option value="almuerzo">Almuerzo</option>
+          <option value="comida">Comida</option>
+          <option value="merienda">Merienda</option>
+          <option value="cena">Cena</option>
+        </select>
+      </div>
     </div>
 
-    <div class="mb-3">
-      <label for="meal_type" class="form-label">Tipo de comida</label>
-      <select name="meal_type" id="meal_type" class="form-select" required>
-        <option value="desayuno">Desayuno</option>
-        <option value="comida">Comida</option>
-        <option value="merienda">Merienda</option>
-        <option value="cena">Cena</option>
-      </select>
-    </div>
-
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 mt-3">
       <button type="submit" class="btn btn-primary">Añadir al diario</button>
       <button
         type="button"
@@ -126,11 +154,11 @@
               <input type="text" id="food-name" class="form-control" required>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Unidad</label>
+              <label class="form-label">Unidad por defecto</label>
               <select id="food-unit" class="form-select">
                 <option value="g">g</option>
                 <option value="ml">ml</option>
-                <option value="unit">unidad</option>
+                <option value="unidad">unidad</option>
               </select>
             </div>
             <div class="col-md-3">
@@ -152,11 +180,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button"
-                  class="btn btn-secondary"
-                  data-bs-dismiss="modal">
-            Cancelar
-          </button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary">Guardar alimento</button>
         </div>
       </div>
@@ -164,34 +188,55 @@
   </div>
 </div>
 
+<!-- Bootstrap Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const $ = (sel, root=document) => root.querySelector(sel);
-  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const $ = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
   const suggestionsBox = $('#suggestions');
   const searchInput    = $('#food-search');
   const foodIdInput    = $('#food-id');
   const mealsList      = $('#today-meals-list');
-  const totalsBox      = $('#totals-box');
+
   let debounceTimer;
 
-  // Helper fetch JSON
+  // --- utils
+  const escapeHtml = s => String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
   async function jsonFetch(url, opts={}){
     const res = await fetch(url, {
-      headers: { 'Content-Type':'application/json', ...(opts.headers||{}) },
-      credentials: 'same-origin',
+      headers: {'Content-Type':'application/json', ...(opts.headers||{})},
+      credentials:'same-origin',
       ...opts
     });
-    let data = null;
-    try { data = await res.json(); } catch(_) { data = null; }
-    if (!res.ok) {
-      const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
-      throw new Error(msg);
-    }
+    let data=null; try{ data=await res.json(); }catch{}
+    if(!res.ok) throw new Error((data && (data.message||data.error)) || `HTTP ${res.status}`);
     return data;
   }
 
-  // ---- 1) Autocomplete (mantiene tu endpoint: /api/foods?search=) ----
+  function currentUnit(){
+    const r = $('input[name="unit"]:checked');
+    return r ? r.value : 'g';
+  }
+
+  function defaultUnitForFood(food){
+    // Si el alimento tiene *_per_unit, proponemos 'unidad'. Si no, lo que venga por defecto.
+    if (food && food.macros_per_unit) return 'unidad';
+    return (food && food.default_unit) || 'g';
+  }
+
+  function setUnitPicker(value){
+    const v = (value||'').toLowerCase();
+    const id = v === 'ml' ? '#unit-ml' : v === 'unidad' ? '#unit-unidad' : '#unit-g';
+    const input = $(id);
+    if (input) input.checked = true;
+  }
+
+  // ---- 1) Autocomplete
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     const q = searchInput.value.trim();
@@ -212,13 +257,14 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const item of foods) {
           const li = document.createElement('li');
           li.className = 'list-group-item list-group-item-action';
-          li.setAttribute('role', 'option');
+          li.setAttribute('role','option');
           const kcal100 = item?.macros_per_100g?.kcal ?? 0;
           li.innerHTML = `<strong>${escapeHtml(item.name)}</strong> <small class="text-muted">(${kcal100} kcal/100g)</small>`;
           li.style.cursor = 'pointer';
           li.addEventListener('click', () => {
-            searchInput.value    = item.name;
-            foodIdInput.value    = item.id;
+            searchInput.value = item.name;
+            foodIdInput.value = item.id;
+            setUnitPicker(defaultUnitForFood(item));
             suggestionsBox.innerHTML = '';
             $('#quantity')?.focus();
           });
@@ -236,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ---- 2) Crear alimento desde modal (mantiene tu payload) ----
+  // ---- 2) Crear alimento desde modal
   $('#create-food-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
@@ -256,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await jsonFetch('/api/foods', { method:'POST', body: JSON.stringify(payload) });
       searchInput.value = data.food.name;
       foodIdInput.value = data.food.id;
+      setUnitPicker(defaultUnitForFood(data.food));
       bootstrap.Modal.getInstance(document.getElementById('foodModal')).hide();
       $('#quantity')?.focus();
     }catch(e){
@@ -263,35 +310,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ---- 3) Añadir comida (POST AJAX) ----
+  // ---- 3) Añadir comida
   $('#add-meal-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
       food_id: parseInt(foodIdInput.value),
       quantity: parseFloat($('#quantity').value),
-      meal_type: $('#meal_type').value
+      meal_type: $('#meal_type').value,
+      unit: currentUnit()
     };
     if (!payload.food_id) return alert('Elige un alimento de la lista.');
     if (!payload.quantity || payload.quantity <= 0) return alert('Cantidad inválida.');
     try{
       const resp = await jsonFetch('/api/meals', { method:'POST', body: JSON.stringify(payload) });
-      const m = resp.meal;
-      appendMealRow(m);
-      await refreshTotals(); // servidor si existe stats
+      appendMealRow(resp.meal);
+      await refreshTotals();
       // reset
       searchInput.value = '';
       foodIdInput.value = '';
       $('#quantity').value = '';
+      setUnitPicker('g');
       suggestionsBox.innerHTML = '';
     }catch(e){
       alert(e.message || 'Error al añadir comida');
     }
   });
 
-  // ---- 4) Editar y borrar (delegación) ----
+  // ---- 4) Delegación: borrar / editar / ±
   mealsList.addEventListener('click', async (e) => {
     const row = e.target.closest('.meal-row'); if (!row) return;
     const id = row.dataset.mealId;
+    const unit = (row.dataset.unit || 'g').toLowerCase();
+    const step = unit === 'unidad' ? 1 : 5;
 
     // Borrar
     if (e.target.matches('.delete-meal')) {
@@ -303,9 +353,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }catch(err){
         alert(err.message || 'Error al borrar');
       }
+      return;
     }
 
-    // Editar cantidad
+    // Edit (prompt)
     if (e.target.matches('.edit-meal')) {
       const qtySpan = row.querySelector('.meal-quantity');
       const oldQty  = parseFloat(qtySpan.textContent);
@@ -319,63 +370,85 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'PUT',
           body: JSON.stringify({ quantity: newQty })
         });
-        // Actualiza fila
-        qtySpan.textContent = meal.quantity;
-        row.querySelector('.meal-calories').textContent = meal.calories;
-        // Si backend devuelve macros, actualízalas y data-*
-        if (typeof meal.protein !== 'undefined') {
-          row.dataset.protein = meal.protein;
-          const p = row.querySelector('.meal-protein'); if (p) p.textContent = meal.protein;
-        }
-        if (typeof meal.carbs !== 'undefined') {
-          row.dataset.carbs = meal.carbs;
-          const c = row.querySelector('.meal-carbs'); if (c) c.textContent = meal.carbs;
-        }
-        if (typeof meal.fats !== 'undefined') {
-          row.dataset.fats = meal.fats;
-          const f = row.querySelector('.meal-fats'); if (f) f.textContent = meal.fats;
-        }
+        updateRow(row, meal);
         await refreshTotals();
       }catch(err){
         alert(err.message || 'Error al editar comida');
       }
+      return;
+    }
+
+    // Minus / Plus
+    if (e.target.matches('.qty-minus') || e.target.matches('.qty-plus')) {
+      const qtySpan = row.querySelector('.meal-quantity');
+      const current = parseFloat(qtySpan.textContent) || 0;
+      const next = e.target.matches('.qty-plus') ? current + step : Math.max(0.01, current - step);
+      try{
+        const { meal } = await jsonFetch(`/api/meals/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ quantity: next })
+        });
+        updateRow(row, meal);
+        await refreshTotals();
+      }catch(err){
+        alert(err.message || 'No se pudo ajustar.');
+      }
     }
   });
 
-  // ---- Helpers UI ----
+  // ---- Helpers de UI ----
   function appendMealRow(m){
     const row = document.createElement('div');
     row.className = 'd-flex justify-content-between align-items-center py-1 border-bottom meal-row';
     row.dataset.mealId = m.id;
-    if (typeof m.protein !== 'undefined') row.dataset.protein = m.protein;
-    if (typeof m.carbs !== 'undefined')   row.dataset.carbs   = m.carbs;
-    if (typeof m.fats !== 'undefined')    row.dataset.fats    = m.fats;
-    if (typeof m.calories !== 'undefined')row.dataset.kcal    = m.calories;
+    row.dataset.unit = (m.unit || m.food?.default_unit || 'g');
+    row.dataset.kcal = m.calories;
+    row.dataset.protein = m.protein ?? 0;
+    row.dataset.carbs = m.carbs ?? 0;
+    row.dataset.fats = m.fats ?? 0;
 
-    const macrosHtml = (['protein','carbs','fats'].every(k => typeof m[k] !== 'undefined'))
-      ? `<small class="text-muted d-inline-block ms-2">
-           <span class="meal-protein">${m.protein}</span>P ·
-           <span class="meal-carbs">${m.carbs}</span>C ·
-           <span class="meal-fats">${m.fats}</span>G
-         </small>`
-      : '';
+    const macrosHtml = `
+      <small class="text-muted d-inline-block ms-2">
+        <span class="meal-protein">${m.protein ?? 0}</span>P ·
+        <span class="meal-carbs">${m.carbs ?? 0}</span>C ·
+        <span class="meal-fats">${m.fats ?? 0}</span>G
+      </small>`;
 
     row.innerHTML = `
-      <div>
+      <div class="me-2">
         <strong class="meal-time">${escapeHtml(m.time || '')}</strong> —
-        ${escapeHtml(m.food?.name || m.food_name || '')}
-        (<span class="meal-quantity">${m.quantity}</span> ${escapeHtml(m.food?.default_unit || m.food_default_unit || '')})
+        ${escapeHtml(m.food?.name || '')}
+        (<span class="meal-quantity">${m.quantity}</span>
+         <span class="meal-unit">${escapeHtml(m.unit || m.food?.default_unit || '')}</span>)
         ${macrosHtml}
       </div>
-      <div class="d-flex align-items-center">
+      <div class="d-flex align-items-center gap-1">
+        <div class="btn-group btn-group-sm me-2" role="group" aria-label="Ajustar cantidad">
+          <button class="btn btn-outline-secondary qty-minus" title="Restar">−</button>
+          <button class="btn btn-outline-secondary qty-plus" title="Sumar">+</button>
+        </div>
         <span class="me-3"><span class="meal-calories">${m.calories}</span> kcal</span>
-        <button class="btn btn-sm btn-outline-secondary me-1 edit-meal" aria-label="Editar comida">✏️</button>
+        <button class="btn btn-sm btn-outline-secondary me-1 edit-meal" aria-label="Editar cantidad">✏️</button>
         <button class="btn btn-sm btn-outline-danger delete-meal" aria-label="Eliminar comida">🗑️</button>
       </div>`;
     mealsList.appendChild(row);
   }
 
-  // Refresca totales: intenta /api/meals/stats?date=YYYY-MM-DD, si falla recurre a DOM
+  function updateRow(row, m){
+    row.dataset.unit = (m.unit || row.dataset.unit || 'g');
+    row.dataset.kcal = m.calories;
+    row.dataset.protein = m.protein ?? 0;
+    row.dataset.carbs = m.carbs ?? 0;
+    row.dataset.fats = m.fats ?? 0;
+
+    row.querySelector('.meal-quantity').textContent = m.quantity;
+    row.querySelector('.meal-unit').textContent = m.unit || row.querySelector('.meal-unit').textContent;
+    row.querySelector('.meal-calories').textContent = m.calories;
+    const p = row.querySelector('.meal-protein'); if (p) p.textContent = m.protein ?? 0;
+    const c = row.querySelector('.meal-carbs');   if (c) c.textContent = m.carbs ?? 0;
+    const f = row.querySelector('.meal-fats');    if (f) f.textContent = m.fats ?? 0;
+  }
+
   async function refreshTotals(){
     const todayISO = new Date().toISOString().slice(0,10);
     try{
@@ -385,29 +458,18 @@ document.addEventListener('DOMContentLoaded', () => {
       $('#total-carbs').textContent   = data.total?.carbs ?? 0;
       $('#total-fats').textContent    = data.total?.fat ?? 0;
     }catch(_){
-      // Fallback: suma de la UI (solo si hay datos)
-      let tk=0, tp=0, tc=0, tf=0;
+      let tk=0,tp=0,tc=0,tf=0;
       $$('.meal-row').forEach(r=>{
-        const kcal = parseFloat(r.querySelector('.meal-calories')?.textContent || r.dataset.kcal || 0) || 0;
-        tk += kcal;
-        tp += parseFloat(r.dataset.protein || r.querySelector('.meal-protein')?.textContent || 0) || 0;
-        tc += parseFloat(r.dataset.carbs   || r.querySelector('.meal-carbs')?.textContent   || 0) || 0;
-        tf += parseFloat(r.dataset.fats    || r.querySelector('.meal-fats')?.textContent    || 0) || 0;
+        tk += parseFloat(r.querySelector('.meal-calories')?.textContent || 0) || 0;
+        tp += parseFloat(r.querySelector('.meal-protein')?.textContent || 0) || 0;
+        tc += parseFloat(r.querySelector('.meal-carbs')?.textContent   || 0) || 0;
+        tf += parseFloat(r.querySelector('.meal-fats')?.textContent    || 0) || 0;
       });
       $('#total-kcal').textContent    = Math.round(tk);
       $('#total-protein').textContent = Math.round(tp);
       $('#total-carbs').textContent   = Math.round(tc);
       $('#total-fats').textContent    = Math.round(tf);
     }
-  }
-
-  function escapeHtml(s){
-    return String(s || '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#39;');
   }
 });
 </script>
