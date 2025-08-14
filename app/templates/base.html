@@ -5,11 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Profuel{% endblock %}</title>
 
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-  <!-- Bootstrap Icons (opcional, útil para UI) -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- Bootstrap CSS (5.3.2 con SRI correcto) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+    crossorigin="anonymous">
+
+  <!-- Bootstrap Icons (opcional) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+    rel="stylesheet">
 
   <!-- Estilos propios -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -19,12 +25,13 @@
 <body class="bg-light">
 
   <!-- NAVBAR -->
-  <nav class="navbar navbar-expand-lg bg-white border-bottom mb-4">
+  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom mb-4">
     <div class="container">
-      <a class="navbar-brand fw-semibold" href="{{ url_for('main.index') }}">Profuel</a>
+      <!-- Logo → Home nueva -->
+      <a class="navbar-brand fw-semibold" href="{{ url_for('home_ui.index') }}">Profuel</a>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar"
-              aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+              aria-controls="mainNavbar" aria-expanded="false" aria-label="Cambiar navegación">
         <span class="navbar-toggler-icon"></span>
       </button>
 
@@ -32,11 +39,17 @@
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           {% if current_user.is_authenticated %}
             <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+              <a class="nav-link" href="{{ url_for('home_ui.index') }}">Hoy</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('nutrition.new_meal') }}">Añadir Comida</a>
+              <a class="nav-link" href="{{ url_for('diary_ui.today') }}">Diario</a>
             </li>
+            <!-- Si quieres mantener el dashboard antiguo, usa auth.dashboard -->
+            <!--
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('auth.dashboard') }}">Dashboard (legacy)</a>
+            </li>
+            -->
             <li class="nav-item">
               <a class="nav-link" href="{{ url_for('auth.profile') }}">Perfil</a>
             </li>
@@ -68,7 +81,7 @@
         {% for category, msg in messages %}
           <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
             {{ msg }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
           </div>
         {% endfor %}
       {% endif %}
@@ -78,25 +91,26 @@
   </div>
 
   <!-- Bootstrap Bundle (incluye Popper) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-          integrity="sha384-MRC6R0Gqg3O0QxwU3F2o0p6qz0b4Fh5w2w2tE0v1b7Cj5rFQ6Z4kQ7n9l1y1zV7R"
-          crossorigin="anonymous"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+    crossorigin="anonymous"></script>
 
-  <!-- Helper: marcar como activa la ruta actual en la navbar -->
+  <!-- Marcar activa la ruta actual -->
   <script>
     (function () {
       try {
-        const here = location.pathname;
+        const here = location.pathname.replace(/\/+$/, '') || '/';
         document.querySelectorAll('.navbar .nav-link').forEach(a => {
-          if (!a.getAttribute('href')) return;
-          // Marca activa si coincide exactamente o si es prefijo (p.ej. /dashboard, /dashboard/stats)
-          const link = a.getAttribute('href');
+          const href = a.getAttribute('href');
+          if (!href) return;
+          const link = new URL(href, location.origin).pathname.replace(/\/+$/, '') || '/';
           if (here === link || (link !== '/' && here.startsWith(link))) {
             a.classList.add('active');
             a.setAttribute('aria-current', 'page');
           }
         });
-      } catch (e) { /* sin romper la UI */ }
+      } catch (e) { /* no romper la UI */ }
     })();
   </script>
 

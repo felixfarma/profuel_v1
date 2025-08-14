@@ -18,7 +18,7 @@ auth_routes = Blueprint("auth", __name__)
 
 def is_safe_url(target: str) -> bool:
     """
-    Ensure the 'next' URL is local to this app to avoid open redirects.
+    Evita open redirects: comprueba que 'next' apunta al mismo host.
     """
     base_url = request.host_url
     test_url = urljoin(base_url, target)
@@ -28,9 +28,10 @@ def is_safe_url(target: str) -> bool:
     )
 
 
-@auth_routes.route("/")
-def home():
-    return redirect(url_for("auth.login"))
+# ⚠️ IMPORTANTE:
+# Quitamos la ruta "/" aquí para no pisar la Home nueva (home_ui.index).
+# Si alguien visita "/" sin estar logueado, home_ui.index tiene @login_required
+# y redirigirá automáticamente a /login.
 
 
 @auth_routes.route("/register", methods=("GET", "POST"))
@@ -47,10 +48,7 @@ def register():
             flash("El usuario ya existe. Por favor, inicia sesión.", "warning")
             return redirect(url_for("auth.login"))
 
-        user = User(
-            email=email,
-            password=generate_password_hash(password)
-        )
+        user = User(email=email, password=generate_password_hash(password))
         db.session.add(user)
         db.session.commit()
 
@@ -67,10 +65,11 @@ def login():
         user = User.query.filter_by(email=form.email.data.strip()).first()
         if user and check_password_hash(user.password, form.password.data):
             login_user(user)
+            # Respeta 'next' si es seguro; si no, ve a la Home nueva
             next_page = request.args.get("next")
-            if not next_page or not is_safe_url(next_page):
-                return redirect(url_for("main.dashboard"))
-            return redirect(next_page)
+            if next_page and is_safe_url(next_page):
+                return redirect(next_page)
+            return redirect(url_for("home_ui.index"))
         flash("Credenciales inválidas.", "danger")
     return render_template("login.html", form=form)
 
@@ -82,16 +81,17 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
+# ---- Dashboard antiguo (legacy), se mantiene por compatibilidad ----
 @auth_routes.route("/dashboard")
 @login_required
 def dashboard():
-    # Ensure profile exists
+    # Asegura perfil
     profile = Profile.query.filter_by(user_id=current_user.id).first()
     if not profile:
         flash("Por favor, completa tu perfil primero.", "warning")
         return redirect(url_for("auth.profile"))
 
-    # Compute energy requirements
+    # Cálculos energéticos
     edad = calcular_edad(profile.fecha_nacimiento)
     bmr = calcular_bmr(
         profile.formula_bmr,
@@ -99,31 +99,30 @@ def dashboard():
         peso=profile.peso,
         altura=profile.altura,
         edad=edad,
-        porcentaje_grasa=profile.porcentaje_grasa
+        porcentaje_grasa=profile.porcentaje_grasa,
     )
     tdee = calcular_tdee(bmr, float(profile.actividad))
 
-    # Today's meals
+    # Comidas de hoy (modelo legacy)
     hoy = date.today()
     meals = (
-        Meal.query
-        .filter_by(user_id=current_user.id, date=hoy)
+        Meal.query.filter_by(user_id=current_user.id, date=hoy)
         .order_by(Meal.time)
         .all()
     )
 
-    # Totals
+    # Totales
     total_proteinas = sum(m.protein for m in meals)
-    total_carbs    = sum(m.carbs   for m in meals)
-    total_grasas   = sum(m.fats    for m in meals)
-    total_kcal     = sum(m.calories for m in meals)
+    total_carbs = sum(m.carbs for m in meals)
+    total_grasas = sum(m.fats for m in meals)
+    total_kcal = sum(m.calories for m in meals)
 
-    # Data for Chart.js
-    labels          = [f"{m.time.strftime('%H:%M')} {m.food.name}" for m in meals]
-    data_proteinas  = [m.protein for m in meals]
-    data_carbs      = [m.carbs   for m in meals]
-    data_grasas     = [m.fats    for m in meals]
-    calorie_data    = [total_kcal, tdee]
+    # Datos para Chart.js
+    labels = [f"{m.time.strftime('%H:%M')} {m.food.name}" for m in meals]
+    data_proteinas = [m.protein for m in meals]
+    data_carbs = [m.carbs for m in meals]
+    data_grasas = [m.fats for m in meals]
+    calorie_data = [total_kcal, tdee]
 
     return render_template(
         "dashboard.html",
@@ -141,7 +140,7 @@ def dashboard():
         chart_proteinas=data_proteinas,
         chart_carbs=data_carbs,
         chart_grasas=data_grasas,
-        chart_calories=calorie_data
+        chart_calories=calorie_data,
     )
 
 
@@ -151,27 +150,28 @@ def profile():
     form = ProfileForm()
     profile = Profile.query.filter_by(user_id=current_user.id).first()
 
-    # Pre-fill form if profile exists
+    # Pre-rellena si existe
     if request.method == "GET" and profile:
-        form.sexo.data             = profile.sexo
-        form.altura.data           = profile.altura
-        form.peso.data             = profile.peso
+        form.sexo.data = profile.sexo
+        form.altura.data = profile.altura
+        form.peso.data = profile.peso
         form.fecha_nacimiento.data = profile.fecha_nacimiento
-        form.actividad.data        = str(profile.actividad)
-        form.formula_bmr.data      = profile.formula_bmr
+        form.actividad.data = str(profile.actividad)
+        form.formula_bmr.data = profile.formula_bmr
         form.porcentaje_grasa.data = profile.porcentaje_grasa
 
     if form.validate_on_submit():
         if not profile:
             profile = Profile(user_id=current_user.id)
         form.populate_obj(profile)
-        profile.actividad        = float(form.actividad.data)
-        profile.formula_bmr      = form.formula_bmr.data
+        profile.actividad = float(form.actividad.data)
+        profile.formula_bmr = form.formula_bmr.data
         profile.porcentaje_grasa = form.porcentaje_grasa.data or None
         db.session.add(profile)
         db.session.commit()
 
         flash("Perfil actualizado correctamente.", "success")
-        return redirect(url_for("auth.dashboard"))
+        # Tras guardar, ve a la Home nueva (más útil que el dashboard legacy)
+        return redirect(url_for("home_ui.index"))
 
     return render_template("profile.html", form=form)

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Hoy — Profuel{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-xl-10 mx-auto">
+
+    <!-- HERO: Anillos + Contexto Entreno + CTA -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+          <div>
+            <h2 class="mb-1">Hoy <small class="text-muted" id="todayDate"></small></h2>
+            <div id="trainContext" class="small text-muted"></div>
+          </div>
+
+          <!-- Anillos simples (barras) -->
+          <div class="w-100 w-lg-auto d-grid gap-2" style="min-width: 320px;">
+            <div>
+              <div class="d-flex justify-content-between small"><span>Kcal</span><span id="kcalText">0 / 0</span></div>
+              <div class="progress" role="progressbar" aria-label="Kcal">
+                <div id="kcalBar" class="progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="d-flex justify-content-between small"><span>Carbs</span><span id="choText">0 g / 0 g</span></div>
+              <div class="progress" role="progressbar" aria-label="Carbs">
+                <div id="choBar" class="progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="d-flex justify-content-between small"><span>Proteínas</span><span id="proText">0 g / 0 g</span></div>
+              <div class="progress" role="progressbar" aria-label="Proteínas">
+                <div id="proBar" class="progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="d-flex justify-content-between small"><span>Grasas</span><span id="fatText">0 g / 0 g</span></div>
+              <div class="progress" role="progressbar" aria-label="Grasas">
+                <div id="fatBar" class="progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CTA principal -->
+          <div class="text-lg-end">
+            <div id="topRecBlock" class="d-none">
+              <div class="small text-muted">Recomendado ahora</div>
+              <div class="fw-semibold" id="topRecTitle">—</div>
+              <div class="small text-muted" id="topRecWhy">—</div>
+              <button id="btnUseTop" class="btn btn-primary mt-2">Usar ahora</button>
+            </div>
+            <div id="noRecBlock" class="text-muted small d-none">
+              Crea tus plantillas en “Diario” y vuelve aquí.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enlace para ver el día completo -->
+    <div class="d-flex justify-content-end mb-3">
+      <a class="btn btn-outline-secondary" href="{{ url_for('diary_ui.today') }}">Ver día completo</a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/home_index.js') }}"></script>
+{% endblock %}
