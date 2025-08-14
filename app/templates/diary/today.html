@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Diario — Hoy{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-lg-10 mx-auto">
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="mb-0">Diario — <span id="todayDate"></span></h2>
+      <div class="d-flex gap-2">
+        <button id="btnUseBreakfast" class="btn btn-primary">
+          Usar desayuno base
+        </button>
+        <button id="btnReload" class="btn btn-outline-secondary">
+          Recargar
+        </button>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-header">Desayuno (persistido)</div>
+          <div class="card-body">
+            <div id="breakfastEmpty" class="text-muted d-none">Aún no hay desayuno guardado hoy.</div>
+            <ul id="breakfastList" class="list-group"></ul>
+            <div class="mt-3">
+              <small class="text-muted">Totales desayuno:</small>
+              <div id="breakfastTotals" class="fw-semibold"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-header">Totales del día</div>
+          <div class="card-body">
+            <div id="dayTotals" class="fs-5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal sustitución rápida -->
+<div class="modal fade" id="subModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="subForm" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Sustituir ingrediente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="subSlotId">
+        <div class="mb-2">
+          <label class="form-label">Nombre alimento</label>
+          <input id="subName" class="form-control" placeholder="p.ej. Fresa">
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Cantidad</label>
+            <input id="subQty" type="number" class="form-control" value="100">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Unidad</label>
+            <input id="subUnit" class="form-control" value="g">
+          </div>
+        </div>
+        <hr>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label">Kcal</label><input id="subKcal" type="number" class="form-control" value="0"></div>
+          <div class="col-6"><label class="form-label">Carbs (g)</label><input id="subCho" type="number" class="form-control" value="0"></div>
+          <div class="col-6"><label class="form-label mt-2">Proteínas (g)</label><input id="subPro" type="number" class="form-control" value="0"></div>
+          <div class="col-6"><label class="form-label mt-2">Grasas (g)</label><input id="subFat" type="number" class="form-control" value="0"></div>
+        </div>
+        <div class="form-text mt-2">Para pruebas rápidas. Más adelante esto usará el buscador/escáner.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" type="submit">Sustituir</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/diary_today.js') }}"></script>
+{% endblock %}
