@@ -1,190 +1,242 @@
 # app/routes/diary_apply.py
-from flask import Blueprint, request, jsonify
-from flask_login import current_user, login_required
-from datetime import datetime
+from datetime import datetime, time as time_cls
+from flask import Blueprint, request, jsonify, current_app
+from flask_login import login_required, current_user
 
-from app.models.base_meals import BaseMeal, BaseMealSlot, SlotAlternative
-from app.services.diary_adapter import add_items_to_diary
+from app import db
+from app.models.user import Meal
+from app.models.base_meals import BaseMeal, BaseMealSlot
+from app.models.food import Food  # para crear/buscar foods
 
 bp_diary_apply = Blueprint("diary_apply", __name__, url_prefix="/api/diary")
 
 
-def _require_json():
-    if not request.is_json:
-        return jsonify({"error": "Content-Type must be application/json"}), 415
-    return None
-
-
-def _uid():
+def _uid() -> int:
     return int(current_user.id)
 
 
-@bp_diary_apply.route("/apply-base", methods=["POST"])
+def _parse_date(s: str):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+
+def _default_time_for(meal_type: str) -> datetime.time:
+    mt = (meal_type or "").lower()
+    if mt == "desayuno":
+        return time_cls(8, 0)
+    if mt in ("comida", "almuerzo", "lunch"):
+        return time_cls(14, 0)
+    if mt == "cena":
+        return time_cls(21, 0)
+    now = datetime.now()
+    return time_cls(now.hour, now.minute)
+
+
+def _set_if_has(model_obj, field: str, value):
+    try:
+        if hasattr(model_obj.__class__, field):
+            setattr(model_obj, field, value)
+    except Exception:
+        pass
+
+
+def _resolve_food_id_by_name(name: str, user_id: int, external_id: str | None = None, unit: str | None = None) -> int:
+    name = (name or "").strip() or "Alimento (manual)"
+    if external_id and hasattr(Food, "external_id"):
+        q = Food.query.filter(Food.external_id == external_id)
+        if hasattr(Food, "user_id"):
+            q = q.filter(Food.user_id == user_id)
+        f = q.first()
+        if f:
+            return int(f.id)
+    qn = Food.query.filter(Food.name.ilike(name))
+    if hasattr(Food, "user_id"):
+        qn = qn.filter(Food.user_id == user_id)
+    f = qn.first()
+    if f:
+        return int(f.id)
+    f = Food(name=name)
+    if hasattr(Food, "user_id"):
+        f.user_id = user_id
+    _set_if_has(f, "brand", None)
+    _set_if_has(f, "unit", unit or "g")
+    _set_if_has(f, "serving_qty", None)
+    _set_if_has(f, "external_id", external_id or None)
+    _set_if_has(f, "kcal_per_100g", 0)
+    _set_if_has(f, "carbs_per_100g", 0)
+    _set_if_has(f, "protein_per_100g", 0)
+    _set_if_has(f, "fat_per_100g", 0)
+    db.session.add(f)
+    db.session.flush()
+    return int(f.id)
+
+
+def _resolve_food_id_from_slot(slot: BaseMealSlot, user_id: int) -> int:
+    if getattr(slot, "food_id", None):
+        return int(slot.food_id)
+    return _resolve_food_id_by_name(
+        getattr(slot, "food_name", None),
+        user_id=user_id,
+        external_id=getattr(slot, "external_id", None),
+        unit=getattr(slot, "unit", None),
+    )
+
+
+@bp_diary_apply.post("/apply-base")
 @login_required
-def apply_base_to_day():
-    """
-    Aplica un base (ej. desayuno) al día.
-    Request: { "meal_type": "desayuno", "date": "YYYY-MM-DD" }
-    """
-    err = _require_json()
-    if err:
-        return err
-    body = request.get_json()
+def apply_base():
+    data = request.get_json(silent=True) or {}
+    meal_type = (data.get("meal_type") or "").strip().lower()
+    date_str = (data.get("date") or "").strip()
+    time_str = (data.get("time") or "").strip()
 
-    meal_type = (body.get("meal_type") or "").strip().lower()
-    date_iso = (body.get("date") or "").strip()
-    if meal_type not in ("desayuno", "comida", "merienda", "cena", "snack"):
-        return jsonify({"error": "meal_type inválido."}), 400
-    if not date_iso:
-        return jsonify({"error": "date es obligatorio."}), 400
+    if not meal_type or not date_str:
+        return jsonify({"error": "meal_type y date son obligatorios"}), 400
 
-    user_id = _uid()
-    base = BaseMeal.query.filter_by(user_id=user_id, meal_type=meal_type).first()
-    if not base or not base.slots:
-        return jsonify({"error": "No tienes un base creado para ese meal_type."}), 404
+    date_obj = _parse_date(date_str)
+    if not date_obj:
+        return jsonify({"error": "date inválido (YYYY-MM-DD)"}), 400
 
-    items = []
-    for s in base.slots:
-        items.append({
-            "slot_id": s.id,
-            "slot_name": s.slot_name,
-            "food_id": s.food_id,
-            "food_name": s.food_name,
-            "external_id": s.external_id,
-            "unit": s.unit,
-            "serving_qty": s.serving_qty,
-            "kcal": s.kcal,
-            "cho_g": s.cho_g,
-            "pro_g": s.pro_g,
-            "fat_g": s.fat_g,
-        })
-
-    payload = add_items_to_diary(user_id=user_id, date_iso=date_iso, meal_type=meal_type, items=items)
-    return jsonify({"data": payload}), 200
-
-
-@bp_diary_apply.route("/slot/<int:slot_id>", methods=["PATCH"])
-@login_required
-def substitute_slot_item(slot_id: int):
-    """
-    Sustituye el alimento de un slot para el 'día' actual (respuesta stateless).
-    - NO modifica la plantilla base (solo calcula resultado y alimenta historial).
-    Request body (ejemplo):
-    {
-      "food_id": null,
-      "food_name": "Fresa",
-      "external_id": null,
-      "unit": "g",
-      "serving_qty": 150,
-      "kcal": 48, "cho_g": 12, "pro_g": 1, "fat_g": 0,
-      "meal_type": "desayuno",
-      "date": "2025-08-13"
-    }
-    """
-    err = _require_json()
-    if err:
-        return err
-    body = request.get_json()
-    user_id = _uid()
-
-    # Datos del nuevo alimento
-    new_item = {
-        "food_id": body.get("food_id"),
-        "food_name": (body.get("food_name") or "").strip(),
-        "external_id": body.get("external_id"),
-        "unit": (body.get("unit") or "g"),
-        "serving_qty": float(body.get("serving_qty") or 0.0),
-        "kcal": float(body.get("kcal") or 0.0),
-        "cho_g": float(body.get("cho_g") or 0.0),
-        "pro_g": float(body.get("pro_g") or 0.0),
-        "fat_g": float(body.get("fat_g") or 0.0),
-    }
-    meal_type = (body.get("meal_type") or "").strip().lower()
-    date_iso = (body.get("date") or "").strip()
-
-    # Validaciones mínimas
-    if not new_item["food_name"]:
-        return jsonify({"error": "food_name es obligatorio."}), 400
-
-    # Cargamos el slot (y validamos que pertenece al usuario)
-    slot = BaseMealSlot.query.join(BaseMeal, BaseMealSlot.base_meal_id == BaseMeal.id)\
-        .filter(BaseMealSlot.id == slot_id, BaseMeal.user_id == user_id).first()
-    if not slot:
-        return jsonify({"error": "Slot no encontrado para tu usuario."}), 404
-
-    base = slot.base_meal
-
-    # Construimos los items del 'meal' tomando los slots de la base,
-    # pero reemplazando ESTE slot concreto por el 'new_item'
-    items = []
-    for s in base.slots:
-        if s.id == slot.id:
-            items.append({
-                "slot_id": s.id,
-                "slot_name": s.slot_name,
-                **new_item
-            })
-        else:
-            items.append({
-                "slot_id": s.id,
-                "slot_name": s.slot_name,
-                "food_id": s.food_id,
-                "food_name": s.food_name,
-                "external_id": s.external_id,
-                "unit": s.unit,
-                "serving_qty": s.serving_qty,
-                "kcal": s.kcal,
-                "cho_g": s.cho_g,
-                "pro_g": s.pro_g,
-                "fat_g": s.fat_g,
-            })
-
-    # Alimentamos el historial de alternativas para este slot
-    # (si existe misma external_id o mismo nombre, incrementa; si no, crea)
-    alt = None
-    if new_item["external_id"]:
-        alt = SlotAlternative.query.filter_by(slot_id=slot.id, external_id=new_item["external_id"]).first()
-    if not alt:
-        alt = SlotAlternative.query.filter_by(slot_id=slot.id, food_name=new_item["food_name"]).first()
-    if not alt:
-        alt = SlotAlternative(
-            slot_id=slot.id,
-            food_id=new_item["food_id"],
-            food_name=new_item["food_name"],
-            external_id=new_item["external_id"],
-            unit=new_item["unit"],
-            serving_qty=new_item["serving_qty"],
-            kcal=new_item["kcal"],
-            cho_g=new_item["cho_g"],
-            pro_g=new_item["pro_g"],
-            fat_g=new_item["fat_g"],
-            times_used=1,
-            last_used=datetime.utcnow(),
-        )
-        from app import db
-        db.session.add(alt)
+    if time_str:
+        try:
+            hh, mm = map(int, time_str.split(":"))
+            meal_time = time_cls(hh, mm)
+        except Exception:
+            meal_time = _default_time_for(meal_type)
     else:
-        alt.times_used = (alt.times_used or 0) + 1
-        alt.last_used = datetime.utcnow()
-        # también actualizamos porción/macros por si cambian en esta alternativa
-        alt.unit = new_item["unit"]
-        alt.serving_qty = new_item["serving_qty"]
-        alt.kcal = new_item["kcal"]
-        alt.cho_g = new_item["cho_g"]
-        alt.pro_g = new_item["pro_g"]
-        alt.fat_g = new_item["fat_g"]
-        from app import db
-    from app import db
+        meal_time = _default_time_for(meal_type)
+
+    base = BaseMeal.query.filter_by(user_id=_uid(), meal_type=meal_type).first()
+    if not base:
+        return jsonify({"error": f"No existe base '{meal_type}' para este usuario"}), 404
+
+    slots = (
+        BaseMealSlot.query
+        .filter_by(base_meal_id=base.id)
+        .order_by(BaseMealSlot.id.asc())
+        .all()
+    )
+    if not slots:
+        return jsonify({"error": "La base no contiene ingredientes (slots)"}), 400
+
+    created_ids, total_kcal = [], 0.0
+    try:
+        for s in slots:
+            food_id = _resolve_food_id_from_slot(s, _uid())
+
+            # DEFAULTS seguros para columnas NOT NULL
+            qty = getattr(s, "serving_qty", None)
+            if qty is None:
+                qty = 1
+            unit = getattr(s, "unit", None) or "g"
+
+            m = Meal(
+                user_id=_uid(),
+                food_id=food_id,
+                date=date_obj,
+                time=meal_time,
+                calories=(s.kcal or 0),
+                protein=(s.pro_g or 0),
+                carbs=(s.cho_g or 0),
+                fats=(s.fat_g or 0),
+            )
+            # Asignar SIEMPRE quantity/unit si existen en el modelo
+            _set_if_has(m, "quantity", qty)
+            _set_if_has(m, "unit", unit)
+
+            _set_if_has(m, "meal_type", meal_type)
+            _set_if_has(m, "type", meal_type)
+            _set_if_has(m, "name", getattr(s, "food_name", None))
+
+            db.session.add(m)
+            db.session.flush()
+            created_ids.append(m.id)
+            total_kcal += float(s.kcal or 0)
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"[apply-base] error: {e}")
+        db.session.rollback()
+        return jsonify({"error": "No se pudo aplicar la base."}), 500
+
+    current_app.logger.info(
+        f"[apply-base] user={_uid()} date={date_str} type={meal_type} "
+        f"slots={len(slots)} created={len(created_ids)} kcal_total={round(total_kcal)}"
+    )
+    return jsonify({"data": {"created_ids": created_ids, "count": len(created_ids)}}), 200
+
+
+@bp_diary_apply.post("/add-item")
+@login_required
+def add_item():
+    data = request.get_json(silent=True) or {}
+    date_str = (data.get("date") or "").strip()
+    meal_type = (data.get("meal_type") or "").strip().lower()
+    name = (data.get("name") or "").strip()
+
+    if not date_str or not meal_type or not (name or data.get("food_id")):
+        return jsonify({"error": "date, meal_type y (name o food_id) son obligatorios"}), 400
+
+    date_obj = _parse_date(date_str)
+    if not date_obj:
+        return jsonify({"error": "date inválido (YYYY-MM-DD)"}), 400
+
+    time_str = (data.get("time") or "").strip()
+    if time_str:
+        try:
+            hh, mm = map(int, time_str.split(":"))
+            meal_time = time_cls(hh, mm)
+        except Exception:
+            meal_time = _default_time_for(meal_type)
+    else:
+        meal_time = _default_time_for(meal_type)
+
+    food_id = data.get("food_id")
+    if not food_id:
+        food_id = _resolve_food_id_by_name(
+            name=name,
+            user_id=_uid(),
+            external_id=(data.get("external_id") or None),
+            unit=(data.get("unit") or None),
+        )
+
+    # DEFAULTS seguros
+    qty = data.get("quantity")
+    if qty is None:
+        qty = 1
+    unit = data.get("unit") or "ración"
+
+    m = Meal(
+        user_id=_uid(),
+        food_id=int(food_id),
+        date=date_obj,
+        time=meal_time,
+        calories=float(data.get("kcal") or 0),
+        protein=float(data.get("pro_g") or 0),
+        carbs=float(data.get("cho_g") or 0),
+        fats=float(data.get("fat_g") or 0),
+    )
+    _set_if_has(m, "meal_type", meal_type)
+    _set_if_has(m, "type", meal_type)
+    _set_if_has(m, "quantity", qty)
+    _set_if_has(m, "unit", unit)
+    _set_if_has(m, "name", name or None)
+
+    db.session.add(m)
     db.session.commit()
 
-    # Calculamos payload usando el adaptador (aún sin persistir el 'día')
-    meal_type = meal_type or base.meal_type
-    date_iso = date_iso or datetime.utcnow().date().isoformat()
-    payload = add_items_to_diary(user_id=user_id, date_iso=date_iso, meal_type=meal_type, items=items)
+    return jsonify({"data": {
+        "id": m.id, "kcal": m.calories, "cho_g": m.carbs, "pro_g": m.protein, "fat_g": m.fats
+    }}), 201
 
-    return jsonify({
-        "data": {
-            "slot_updated": {"slot_id": slot.id, "slot_name": slot.slot_name, **new_item},
-            **payload
-        }
-    }), 200
+
+@bp_diary_apply.delete("/item/<int:item_id>")
+@login_required
+def delete_item(item_id: int):
+    m = Meal.query.filter_by(id=item_id, user_id=_uid()).first()
+    if not m:
+        return jsonify({"error": "No existe esa comida"}), 404
+    db.session.delete(m)
+    db.session.commit()
+    return jsonify({"ok": True}), 200

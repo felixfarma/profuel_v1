@@ -1,39 +1,39 @@
 # app/models/training.py
-from datetime import datetime
 from app import db
 
+# ---------- ENTRENO PREVISTO (INTENT) ----------
 class TrainingIntent(db.Model):
-    """
-    Intención de entreno del día (rápida: mañana/tarde/noche, opcional tipo/duración).
-    Unique por (user_id, date).
-    """
     __tablename__ = "training_intents"
+
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, index=True, nullable=False)
-    date = db.Column(db.String(10), index=True, nullable=False)  # YYYY-MM-DD
-    window = db.Column(db.String(16), nullable=False)  # morning|afternoon|evening
-    type = db.Column(db.String(32), nullable=True)     # run|bike|swim|gym|...
-    est_minutes = db.Column(db.Integer, nullable=True)
-    source = db.Column(db.String(16), default="user", nullable=False)  # user|predicted
-    confidence = db.Column(db.Float, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
+    date = db.Column(db.String(10), nullable=False, index=True)  # YYYY-MM-DD
+    window = db.Column(db.String(16), nullable=False)            # morning | afternoon | evening
+    type = db.Column(db.String(24))                              # run | bike | swim | ...
+    est_minutes = db.Column(db.Integer)                          # duración estimada
 
     __table_args__ = (
-        db.UniqueConstraint("user_id", "date", name="uq_training_intent_user_date"),
+        db.UniqueConstraint("user_id", "date", name="uq_training_intents_user_date"),
     )
 
+    def __repr__(self):
+        return f"<TrainingIntent {self.user_id} {self.date} {self.window}>"
 
+
+# ---------- ENTRENO REALIZADO (ACTUAL) ----------
 class TrainingActual(db.Model):
-    """
-    Entreno real (Strava/Garmin/manual) - pensado para el futuro.
-    """
     __tablename__ = "training_actuals"
+
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, index=True, nullable=False)
-    date = db.Column(db.String(10), index=True, nullable=False)  # YYYY-MM-DD
-    start_at = db.Column(db.DateTime, nullable=True)
-    end_at = db.Column(db.DateTime, nullable=True)
-    type = db.Column(db.String(32), nullable=True)
-    kcal = db.Column(db.Float, nullable=True)
-    source = db.Column(db.String(16), default="strava", nullable=False)  # strava|garmin|manual
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
+    date = db.Column(db.String(10), nullable=False, index=True)  # YYYY-MM-DD
+    type = db.Column(db.String(24), nullable=False)              # run | bike | swim | ...
+    duration_min = db.Column(db.Integer, nullable=False)         # *** este es el nombre que usa la API ***
+    distance_m = db.Column(db.Integer)                           # opcional (metros)
+    elevation_m = db.Column(db.Integer)                          # opcional
+    avg_power_w = db.Column(db.Integer)                          # opcional (ciclismo)
+    avg_hr = db.Column(db.Integer)                               # opcional
+    started_at = db.Column(db.String(5))                         # opcional 'HH:MM' (para pre/post más fino)
+
+    def __repr__(self):
+        return f"<TrainingActual {self.user_id} {self.date} {self.type} {self.duration_min}min>"

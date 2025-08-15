@@ -5,64 +5,243 @@
 <div class="row">
   <div class="col-12 col-xl-10 mx-auto">
 
-    <!-- HERO: Anillos + Contexto Entreno + CTA -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="m-0">Hoy <small class="text-muted" id="todayDate"></small></h2>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addMealModal">
+          + Comida
+        </button>
+        <button class="btn btn-sm btn-outline-primary" onclick="document.getElementById('addTrainOpen').click()">
+          + Entreno
+        </button>
+      </div>
+    </div>
+
+    <!-- CARD: Anillos -->
     <div class="card mb-4">
       <div class="card-body">
-        <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
-          <div>
-            <h2 class="mb-1">Hoy <small class="text-muted" id="todayDate"></small></h2>
-            <div id="trainContext" class="small text-muted"></div>
+        <div class="d-flex flex-column gap-3">
+
+          <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+            <div>
+              <div id="trainContext" class="small text-muted"></div>
+            </div>
+
+            <div class="w-100 w-lg-auto d-grid gap-2" style="min-width: 320px;">
+              <div>
+                <div class="d-flex justify-content-between small"><span>Kcal</span><span id="kcalText">0 / 0</span></div>
+                <div class="progress"><div id="kcalBar" class="progress-bar" style="width:0%"></div></div>
+              </div>
+              <div>
+                <div class="d-flex justify-content-between small"><span>Carbs</span><span id="choText">0 g / 0 g</span></div>
+                <div class="progress"><div id="choBar" class="progress-bar" style="width:0%"></div></div>
+              </div>
+              <div>
+                <div class="d-flex justify-content-between small"><span>Proteínas</span><span id="proText">0 g / 0 g</span></div>
+                <div class="progress"><div id="proBar" class="progress-bar" style="width:0%"></div></div>
+              </div>
+              <div>
+                <div class="d-flex justify-content-between small"><span>Grasas</span><span id="fatText">0 g / 0 g</span></div>
+                <div class="progress"><div id="fatBar" class="progress-bar" style="width:0%"></div></div>
+              </div>
+            </div>
+
+            <div class="text-lg-end">
+              <div id="topRecBlock" class="d-none">
+                <div class="small text-muted">Recomendado ahora</div>
+                <div class="fw-semibold" id="topRecTitle">—</div>
+                <div class="small text-muted" id="topRecWhy">—</div>
+                <button id="btnUseTop" class="btn btn-primary mt-2">Usar ahora</button>
+              </div>
+              <div id="noRecBlock" class="text-muted small d-none">
+                Crea tus plantillas en “Diario” y vuelve aquí.
+              </div>
+            </div>
           </div>
 
-          <!-- Anillos simples (barras) -->
-          <div class="w-100 w-lg-auto d-grid gap-2" style="min-width: 320px;">
-            <div>
-              <div class="d-flex justify-content-between small"><span>Kcal</span><span id="kcalText">0 / 0</span></div>
-              <div class="progress" role="progressbar" aria-label="Kcal">
-                <div id="kcalBar" class="progress-bar" style="width:0%"></div>
+          <!-- Chips intención -->
+          <div id="chipsBox" class="d-flex flex-column gap-2">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="small text-muted">¿Vas a entrenar hoy?</span>
+              <div class="btn-group" role="group" aria-label="train today">
+                <button id="chipYes" type="button" class="btn btn-sm btn-outline-primary">Sí</button>
+                <button id="chipNo" type="button" class="btn btn-sm btn-outline-secondary">No</button>
+                <button id="chipUnsure" type="button" class="btn btn-sm btn-outline-secondary">No sé</button>
               </div>
             </div>
-            <div>
-              <div class="d-flex justify-content-between small"><span>Carbs</span><span id="choText">0 g / 0 g</span></div>
-              <div class="progress" role="progressbar" aria-label="Carbs">
-                <div id="choBar" class="progress-bar" style="width:0%"></div>
-              </div>
-            </div>
-            <div>
-              <div class="d-flex justify-content-between small"><span>Proteínas</span><span id="proText">0 g / 0 g</span></div>
-              <div class="progress" role="progressbar" aria-label="Proteínas">
-                <div id="proBar" class="progress-bar" style="width:0%"></div>
-              </div>
-            </div>
-            <div>
-              <div class="d-flex justify-content-between small"><span>Grasas</span><span id="fatText">0 g / 0 g</span></div>
-              <div class="progress" role="progressbar" aria-label="Grasas">
-                <div id="fatBar" class="progress-bar" style="width:0%"></div>
+            <div id="winRow" class="d-none">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="small text-muted">Franja:</span>
+                <div class="btn-group" role="group" aria-label="window">
+                  <button id="winMorning" type="button" class="btn btn-sm btn-outline-primary">Mañana</button>
+                  <button id="winAfternoon" type="button" class="btn btn-sm btn-outline-primary">Tarde</button>
+                  <button id="winEvening" type="button" class="btn btn-sm btn-outline-primary">Noche</button>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- CTA principal -->
-          <div class="text-lg-end">
-            <div id="topRecBlock" class="d-none">
-              <div class="small text-muted">Recomendado ahora</div>
-              <div class="fw-semibold" id="topRecTitle">—</div>
-              <div class="small text-muted" id="topRecWhy">—</div>
-              <button id="btnUseTop" class="btn btn-primary mt-2">Usar ahora</button>
-            </div>
-            <div id="noRecBlock" class="text-muted small d-none">
-              Crea tus plantillas en “Diario” y vuelve aquí.
-            </div>
-          </div>
         </div>
       </div>
     </div>
 
-    <!-- Enlace para ver el día completo -->
-    <div class="d-flex justify-content-end mb-3">
-      <a class="btn btn-outline-secondary" href="{{ url_for('diary_ui.today') }}">Ver día completo</a>
+    <!-- CARD: Entrenamiento -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Entrenamiento de hoy</span>
+        <button id="addTrainOpen" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addTrainModal">
+          Añadir entreno
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <ul id="trainList" class="list-group list-group-flush"></ul>
+      </div>
     </div>
 
+    <!-- CARD: Comidas -->
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Comidas de hoy</span>
+        <div class="d-flex gap-2">
+          <div class="btn-group">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+              Usar base
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#" data-apply-base="desayuno">Desayuno</a></li>
+              <li><a class="dropdown-item" href="#" data-apply-base="comida">Comida</a></li>
+              <li><a class="dropdown-item" href="#" data-apply-base="cena">Cena</a></li>
+            </ul>
+          </div>
+          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addMealModal">
+            Añadir comida
+          </button>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('diary_ui.today') }}">Ver día completo</a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <ul id="mealList" class="list-group list-group-flush"></ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL Entreno -->
+<div class="modal fade" id="addTrainModal" tabindex="-1" aria-labelledby="addTrainModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="addTrainForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addTrainModalLabel">Añadir entreno</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Deporte</label>
+          <select class="form-select" id="trainType" required>
+            <option value="run">Correr</option>
+            <option value="bike">Ciclismo</option>
+            <option value="swim">Natación</option>
+            <option value="row">Remo</option>
+            <option value="hike">Senderismo</option>
+            <option value="walk">Caminar</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Duración (min)</label>
+          <input type="number" class="form-control" id="trainDur" min="5" step="1" required>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Distancia (km) <span class="text-muted small">(opcional)</span></label>
+            <input type="number" class="form-control" id="trainDist" min="0" step="0.1">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Desnivel + (m) <span class="text-muted small">(opcional)</span></label>
+            <input type="number" class="form-control" id="trainElev" min="0" step="1">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Potencia media (W) <span class="text-muted small">(opcional)</span></label>
+            <input type="number" class="form-control" id="trainPower" min="0" step="1">
+          </div>
+          <div class="col-6">
+            <label class="form-label">FC media (bpm) <span class="text-muted small">(opcional)</span></label>
+            <input type="number" class="form-control" id="trainHr" min="0" step="1">
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Hora de inicio <span class="text-muted small">(opcional)</span></label>
+          <input type="time" class="form-control" id="trainStart">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL Comida -->
+<div class="modal fade" id="addMealModal" tabindex="-1" aria-labelledby="addMealModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="addMealForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addMealModalLabel">Añadir comida</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Tipo</label>
+          <select class="form-select" id="mealType" required>
+            <option value="desayuno">Desayuno</option>
+            <option value="comida">Comida</option>
+            <option value="cena">Cena</option>
+            <option value="snack">Snack</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Hora <span class="text-muted small">(opcional)</span></label>
+          <input type="time" class="form-control" id="mealTime">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-control" id="mealName" placeholder="p. ej., Yogur con avena" required>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Kcal</label>
+            <input type="number" class="form-control" id="mealKcal" min="0" step="1" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Carbs (g)</label>
+            <input type="number" class="form-control" id="mealCho" min="0" step="1" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Proteínas (g)</label>
+            <input type="number" class="form-control" id="mealPro" min="0" step="1" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Grasas (g)</label>
+            <input type="number" class="form-control" id="mealFat" min="0" step="1" required>
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-6">
+            <label class="form-label">Cantidad <span class="text-muted small">(opcional)</span></label>
+            <input type="number" class="form-control" id="mealQty" min="0" step="0.1">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Unidad <span class="text-muted small">(opcional)</span></label>
+            <input type="text" class="form-control" id="mealUnit" placeholder="g, ración…">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}
