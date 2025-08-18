@@ -1,3 +1,0 @@
-name,default_unit,default_quantity,kcal_per_100g,protein_per_100g,carbs_per_100g,fat_per_100g,kcal_per_unit,protein_per_unit,carbs_per_unit,fat_per_unit
-Ejemplo alimento (100g base),g,100,100,5,10,3,,,,
-Ejemplo por unidad,unidad,1,,,,,120,8,12,4
