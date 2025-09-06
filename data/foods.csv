@@ -1,6 +1,38 @@
-name,kcal_per_100g,protein_per_100g,carbs_per_100g,fat_per_100g,kcal_per_unit,protein_per_unit,carbs_per_unit,fat_per_unit,default_unit,default_quantity
-Manzana,52.0,0.3,14.0,0.2,95.0,0.5,25.0,0.3,pieza,1
-Pan integral,250.0,9.0,49.0,3.4,80.0,2.9,15.7,1.1,rebanada,1
-Pechuga de pollo,165.0,31.0,0.0,3.6,,,,,g,100
-Leche entera,61.0,3.2,4.8,3.3,150.0,8.0,12.0,8.3,vaso,1
-Aceite de oliva virgen extra,884.0,0.0,0.0,100.0,119.0,0.0,0.0,13.5,cucharada,1
+name,default_unit,default_quantity,kcal_per_100g,protein_per_100g,carbs_per_100g,fat_per_100g,kcal_per_unit,protein_per_unit,carbs_per_unit,fat_per_unit
+Leche semidesnatada (Consum),ml,100,46,3.4,4.7,1.6,,,,
+Pan de semillas (Consum),g,100,280,12,40,8,,,,
+Queso crema tipo Philadelphia,g,100,250,5,4,24,,,,
+Crema de cacahuete crunchy,g,100,588,25,20,50,,,,
+Tahini (pasta de sésamo),g,100,595,17,21,53,,,,
+Yogur griego light (Aldi),g,100,60,10,3,1.5,,,,
+Aceite de oliva,ml,100,884,0,0,100,,,,
+Pechuga de pavo asada,g,100,110,24,1,1.5,,,,
+Queso Havarti (lonchas),g,100,350,21,2,28,,,,
+Jamón serrano,g,100,241,31,0,13,,,,
+Macarrones (crudos),g,100,360,12,72,2,,,,
+Arroz blanco cocido,g,100,130,2.7,28.2,0.3,,,,
+Semillas de chía,g,100,486,17,42,31,,,,
+Plátano,g,100,89,1.1,23,0.3,,,,
+Arándanos,g,100,57,0.7,14,0.3,,,,
+Fresas,g,100,32,0.7,7.7,0.3,,,,
+Nutella,g,100,539,6.3,57.5,30.9,,,,
+Cereales Chocapic,g,100,379,7.3,79,3,,,,
+ColaCao (soluble),g,100,382,5.6,86.7,3.5,,,,
+Tomate pera,g,100,18,0.9,3.9,0.2,,,,
+Cebolla tierna,g,100,32,1.3,7.6,0.2,,,,
+Lomo de cerdo (magro),g,100,242,27,0,14,,,,
+Pechuga de pollo,g,100,165,31,0,3.6,,,,
+Dorada (filete),g,100,96,20,0,2.7,,,,
+Salmón (filete),g,100,208,20,0,13,,,,
+Atún en lata al natural (escurrido),g,100,116,26,0,1,,,,
+Huevo (unidad ~60g),unidad,1,155,13,1.1,11,78,6.5,0.7,5.3
+Leche entera,ml,100,61,3.2,4.8,3.4,,,,
+Pan blanco,g,100,265,8.5,49,3.2,,,,
+Arroz blanco (crudo),g,100,358,6.7,78.9,0.6,,,,
+Pasta (cruda),g,100,360,12,72,2,,,,
+Patata cocida,g,100,87,2,20,0.1,,,,
+Yogur natural,g,100,61,3.5,4.7,3.3,,,,
+Garbanzos cocidos,g,100,164,8.9,27.4,2.6,,,,
+Queso manchego curado,g,100,423,26,0,35,,,,
+Azúcar blanco,g,100,387,0,100,0,,,,
+Avena (copos),g,100,371,13.5,60,7,,,,

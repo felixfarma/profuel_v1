@@ -5,70 +5,98 @@
 <div class="row">
   <div class="col-12 col-lg-10 mx-auto">
 
+    <!-- Encabezado -->
     <div class="d-flex align-items-center justify-content-between mb-3">
-      <h2 class="mb-0">Diario — <span id="todayDate"></span></h2>
+      <h2 class="mb-0">
+        Diario — <span id="todayDate" aria-live="polite"></span>
+      </h2>
       <div class="d-flex gap-2">
-        <button id="btnUseBreakfast" class="btn btn-primary">
-          Usar desayuno base
-        </button>
-        <button id="btnReload" class="btn btn-outline-secondary">
+        <button id="btnReload" class="btn btn-outline-secondary" type="button" aria-label="Recargar datos del día">
           Recargar
         </button>
       </div>
     </div>
 
-    <!-- Panel objetivo de la comida + lista de ingredientes -->
+    <!-- Selector de comida -->
+    <ul class="nav nav-tabs mb-3" id="mealTabs" role="tablist" aria-label="Selector de comida">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-meal="desayuno" id="tab-desayuno" type="button" role="tab" aria-selected="true">
+          Desayuno
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-meal="almuerzo" id="tab-almuerzo" type="button" role="tab" aria-selected="false">
+          Almuerzo
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-meal="comida" id="tab-comida" type="button" role="tab" aria-selected="false">
+          Comida
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-meal="merienda" id="tab-merienda" type="button" role="tab" aria-selected="false">
+          Merienda
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-meal="cena" id="tab-cena" type="button" role="tab" aria-selected="false">
+          Cena
+        </button>
+      </li>
+    </ul>
+
     <div class="row g-3">
+      <!-- Objetivo + barras -->
       <div class="col-12 col-lg-5">
         <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Objetivo del desayuno</span>
-            <small class="text-muted" id="mealHeaderTotals"></small>
+          <div class="card-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center">
+            <div class="d-flex align-items-center gap-2">
+              <span id="goalTitle">
+                Objetivo — <span id="goalMealName">Desayuno</span>
+              </span>
+              <small class="text-muted" id="goalMini">K:0 · C:0g · P:0g · G:0g</small>
+            </div>
+
+            <!-- Badge de estrategia dinámica (lo muestra el JS si hay strategy) -->
+            <div id="strategyBadge" class="mt-2 mt-lg-0 d-none">
+              <span class="badge text-bg-warning text-dark"
+                    title="Reparto dinámico por entreno: +CHO pre/post, +PRO post, −GRA cerca del entreno">
+                ⚡ Estrategia dinámica — <span id="badgePre"></span> / <span id="badgePost"></span> · <span id="badgeTime"></span>
+              </span>
+            </div>
           </div>
-          <div class="card-body">
-            <!-- Barras objetivo vs real -->
-            <div id="meal-bars"></div>
+
+          <div class="card-body" id="goalBars" aria-live="polite">
+            <!-- Las barras se renderizan por JS -->
+          </div>
+
+          <!-- Copy aclaratorio (lo muestra el JS cuando hay estrategia) -->
+          <div class="card-footer p-2">
+            <small class="text-muted" id="strategyCopy" style="display:none;">
+              Los objetivos de esta comida se ajustan según tu entreno de hoy.
+            </small>
           </div>
         </div>
       </div>
 
+      <!-- Lista de alimentos de la comida -->
       <div class="col-12 col-lg-7">
         <div class="card">
-          <div class="card-header">
-            Desayuno (persistido)
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span id="mealListTitle">Desayuno</span>
+            <button id="btnAddItem" class="btn btn-sm btn-primary" type="button" aria-label="Añadir alimento a la comida seleccionada">
+              Añadir alimento
+            </button>
           </div>
           <div class="card-body">
-            <div id="breakfastEmpty" class="text-muted d-none">Aún no hay desayuno guardado hoy.</div>
-            <ul id="breakfastList" class="list-group mb-3"></ul>
+            <div id="mealEmpty" class="text-muted d-none">Aún no hay alimentos en esta comida.</div>
+            <ul id="mealList" class="list-group mb-3"></ul>
 
-            <!-- Composición por ingrediente (barras apiladas %) -->
-            <div>
-              <h6 class="mb-2">Composición por ingrediente</h6>
-              <div id="meal-ingredients"></div>
-              <div class="small text-muted mt-2">
-                Leyenda:&nbsp;
-                <span class="badge bg-info">Carbs</span>
-                <span class="badge bg-success">Proteínas</span>
-                <span class="badge bg-warning text-dark">Grasas</span>
-              </div>
+            <div class="mt-2">
+              <small class="text-muted">Totales de la comida:</small>
+              <div id="mealTotals" class="fw-semibold">—</div>
             </div>
-
-            <div class="mt-3">
-              <small class="text-muted">Totales desayuno:</small>
-              <div id="breakfastTotals" class="fw-semibold"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Totales del día (como ya tenías) -->
-    <div class="row g-3 mt-3">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header">Totales del día</div>
-          <div class="card-body">
-            <div id="dayTotals" class="fs-5"></div>
           </div>
         </div>
       </div>
@@ -77,41 +105,41 @@
   </div>
 </div>
 
-<!-- Modal sustitución rápida -->
-<div class="modal fade" id="subModal" tabindex="-1" aria-hidden="true">
+<!-- Modal edición (cantidad/unidad) -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form id="subForm" class="modal-content">
+    <form id="editForm" class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Sustituir ingrediente</h5>
+        <h5 class="modal-title">Editar alimento</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
+
       <div class="modal-body">
-        <input type="hidden" id="subSlotId">
+        <input type="hidden" id="editMealId">
         <div class="mb-2">
-          <label class="form-label">Nombre alimento</label>
-          <input id="subName" class="form-control" placeholder="p.ej. Fresa">
+          <label class="form-label">Alimento</label>
+          <input id="editFoodName" class="form-control" readonly>
         </div>
         <div class="row g-2">
           <div class="col-6">
-            <label class="form-label">Cantidad</label>
-            <input id="subQty" type="number" class="form-control" value="100">
+            <label class="form-label" for="editQty">Cantidad</label>
+            <input id="editQty" type="number" class="form-control" inputmode="decimal" step="0.1" min="0" required>
           </div>
           <div class="col-6">
-            <label class="form-label">Unidad</label>
-            <input id="subUnit" class="form-control" value="g">
+            <label class="form-label" for="editUnit">Unidad</label>
+            <input id="editUnit" class="form-control" list="unitOptions" required>
+            <datalist id="unitOptions">
+              <option value="g"></option>
+              <option value="ml"></option>
+              <option value="unidad"></option>
+            </datalist>
           </div>
         </div>
-        <hr>
-        <div class="row g-2">
-          <div class="col-6"><label class="form-label">Kcal</label><input id="subKcal" type="number" class="form-control" value="0"></div>
-          <div class="col-6"><label class="form-label">Carbs (g)</label><input id="subCho" type="number" class="form-control" value="0"></div>
-          <div class="col-6"><label class="form-label mt-2">Proteínas (g)</label><input id="subPro" type="number" class="form-control" value="0"></div>
-          <div class="col-6"><label class="form-label mt-2">Grasas (g)</label><input id="subFat" type="number" class="form-control" value="0"></div>
-        </div>
-        <div class="form-text mt-2">Para pruebas rápidas. Más adelante esto usará el buscador/escáner.</div>
+        <div class="form-text mt-2">El backend recalcula kcal y macros al guardar.</div>
       </div>
+
       <div class="modal-footer">
-        <button class="btn btn-primary" type="submit">Sustituir</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
       </div>
     </form>
   </div>
@@ -119,6 +147,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/diary_today.js') }}"></script>
-<script src="{{ url_for('static', filename='js/diary_meal_bars.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/diary_today.js') }}" defer></script>
 {% endblock %}
