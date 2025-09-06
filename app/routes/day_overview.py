@@ -5,7 +5,11 @@ from flask_login import login_required, current_user
 from datetime import datetime
 
 from app.services.training_engine import (
-    get_day_targets, get_training_context, get_consumed, get_meals_flat
+    get_day_targets,
+    get_training_context,
+    get_consumed,
+    get_meals_flat,
+    get_dynamic_meal_targets,   # <-- NUEVO: objetivos dinámicos por comida
 )
 
 bp = Blueprint("day_overview", __name__, url_prefix="/api/day")
@@ -22,10 +26,13 @@ def _uid() -> int:
 @login_required
 def overview():
     date_str = request.args.get("date") or datetime.today().date().isoformat()
-    targets = get_day_targets(_uid(), date_str)
-    consumed = get_consumed(_uid(), date_str)
-    training = get_training_context(_uid(), date_str)
-    meals = get_meals_flat(_uid(), date_str)
+    user_id = _uid()
+
+    # --- Datos base (sin cambios) ---
+    targets = get_day_targets(user_id, date_str)
+    consumed = get_consumed(user_id, date_str)
+    training = get_training_context(user_id, date_str)
+    meals = get_meals_flat(user_id, date_str)
 
     data = {
         "rings": {
@@ -51,4 +58,20 @@ def overview():
         "bands": targets.bands,            # semáforo (ratios)
         "weights": targets.meal_weights,   # pesos por comida (el front ajusta si hay snack)
     }
+
+    # --- NUEVO: inyectar objetivos dinámicos por comida si existen ---
+    try:
+        by_meal_dynamic, meta = get_dynamic_meal_targets(user_id, date_str)
+        if by_meal_dynamic:
+            # El front leerá data.by_meal_dynamic con prioridad si está presente
+            data["by_meal_dynamic"] = by_meal_dynamic
+            # Metadatos útiles para trazabilidad/UX (opcionales)
+            if isinstance(meta, dict):
+                if "strategy" in meta: data["strategy"] = meta["strategy"]
+                if "flags" in meta:    data["flags"] = meta["flags"]
+                if "version" in meta:  data["version"] = meta["version"]
+    except Exception:
+        # Silencio seguro: si algo falla, mantenemos el comportamiento legacy
+        pass
+
     return jsonify({"data": data}), 200
